@@ -6,3 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ui = {path = "ui"}
+math = {path = "math"}
+glium = "0.30.2"
+rusttype = "0.9.2"
+image = "0.24.6"
+egui= { version = "0.14.0" }
+egui_glium= { version = "0.14.0" }
+num-complex = "0.4.3"
