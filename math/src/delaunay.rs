@@ -1,8 +1,8 @@
-use nalgebra_glm::{Scalar, Vec2};
+use nalgebra_glm::{Vec2};
 use spade::{DelaunayTriangulation, HasPosition, Point2};
 
 pub struct VertexType {
-    position: Vec2,
+    pub position: Vec2,
     pub radius: f32,
 }
 
@@ -59,7 +59,7 @@ impl Default for FaceType {
     }
 }
 
-pub type Triangulation =
+pub type CsTriangulation =
 DelaunayTriangulation<VertexType, DirectedEdgeType, UndirectedEdgeType, FaceType>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]

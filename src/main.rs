@@ -8,19 +8,15 @@ use glium::uniforms::AsUniformValue;
 use image::{DynamicImage, GenericImage, GenericImageView, ImageBuffer};
 use MapGenerator::{draw_params, load_glsl, show_window, State, UniformStorage, Vertex};
 use MapGenerator::tick::{TICK_DRAW_ID, TICK_FRAME_ID, TICK_RENDER_EGUI_ID, TICK_RENDER_ID, TickSystem};
-use math::{CameraSystem, Ortho, Perspective, RawMat4, TransformBuilder};
-use math::glm::{cross, normalize, vec3};
+use MapGenerator::voronoi::{basic_voronoi_example};
+use math::{Boundary, CameraSystem, Ortho, Perspective, RawMat4, TransformBuilder};
+use math::glm::{cross, normalize, Vec2, vec3};
 use ui::{Binding, Gesture, Input, LoopType};
 use ui::winit::dpi::PhysicalPosition;
 use ui::winit::event::{Event, StartCause};
 use ui::winit::event_loop::ControlFlow;
 
 // compared € [to_compare - epsilon; to_compare + epsilon]
-#[inline]
-fn float_eq(value: f32, compared: f32, epsilon: f32) -> bool {
-    (value - compared).abs() < epsilon
-}
-
 #[inline]
 fn to_radians(degree: f32) -> f32 {
     degree.to_radians()
@@ -33,6 +29,9 @@ const FOV_MIN: f32 = 0.0174533f32;
 const FOV_MAX: f32 = 0.785398f32;
 
 fn main() {
+    let boundary = Boundary::from_top_left(Vec2::new(-10.0,10.0), 20., 20.);
+    basic_voronoi_example(boundary);
+    return;
     let mut camera_speed = 0.05f32;
     let z_axis = vec3(0.0, 0.0, 1.0f32);
     let y_axis = vec3(0.0, 1.0, 0.0f32);
