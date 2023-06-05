@@ -221,6 +221,13 @@ impl Segment {
         let len_ap = ap.dot(&ap);
         len_ab >= len_ap
     }
+
+    pub fn startp(&self) -> Vec2 {
+        self.a
+    }
+    pub fn endp(&self) -> Vec2 {
+        self.b
+    }
 }
 
 #[inline]
