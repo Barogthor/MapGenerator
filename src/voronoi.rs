@@ -62,12 +62,12 @@ impl PartialEq for Point2 {
 impl Eq for Point2 {
 }
 
-pub fn basic_voronoi_example(boundary: Boundary) {
-    let top = Segment::new(boundary.top_right(), boundary.top_left());
-    let right = Segment::new(boundary.bottom_right(), boundary.top_right());
-    let bot = Segment::new(boundary.bottom_left(), boundary.bottom_right());
-    let left = Segment::new(boundary.top_left(), boundary.bottom_left());
-    let triangulation = init_points2().unwrap();
+pub fn basic_voronoi_example(boundary: Boundary) -> Vec<VoronoiRegionBounded> {
+    let top = Segment::new(boundary.top_left(), boundary.top_right());
+    let right = Segment::new(boundary.top_right(), boundary.bottom_right());
+    let bot = Segment::new(boundary.bottom_right(), boundary.bottom_left());
+    let left = Segment::new(boundary.bottom_left(), boundary.top_left());
+    let triangulation = init_points1().unwrap();
     let mut vertices = BTreeSet::new();
     let mut regions = vec![];
     for vertex in triangulation.vertices() {
@@ -75,23 +75,24 @@ pub fn basic_voronoi_example(boundary: Boundary) {
         let region = vertex.as_voronoi_face();
         // println!("next region");
         let mut region_vertices = vec![];
-        let mut tb = false;
-        let mut rb = false;
-        let mut bt = false;
-        let mut lb = false;
-        for edge in region.adjacent_edges() {
+        let mut tb = None;
+        let mut rb = None;
+        let mut bb = None;
+        let mut lb = None;
+        for (i, edge) in region.adjacent_edges().enumerate() {
             // let edge_director = edge.direction_vector();
             // let edge_director = Vec2::new(edge_director.x, edge_director.y);
 
             // let start_pt = edge.from().position().map(|p| Point2(p.x, p.y));
             // let end_pt = edge.to().position().map(|p| Point2(p.x, p.y));
 
-            match edge.as_undirected().vertices() {
+            match [edge.from(), edge.to()]{
                 [Inner(from), Inner(to)] => {
                     let from = from.circumcenter();
                     let to = to.circumcenter();
-                    region_vertices.push(VoronoiVertex::Inner(Vec2::new(from.x, from.y)));
+
                     region_vertices.push(VoronoiVertex::Inner(Vec2::new(to.x, to.y)));
+                    region_vertices.push(VoronoiVertex::Inner(Vec2::new(from.x, from.y)));
                     vertices.insert(Point2(from.x, from.y));
                     vertices.insert(Point2(to.x, to.y));
                 },
@@ -103,62 +104,87 @@ pub fn basic_voronoi_example(boundary: Boundary) {
                     // println!("{:?}, {:?}",from, dir);
                     if let Some(point) = left.intercept_by_ray(dir, from)
                     {
-                        lb = true;
                         region_vertices.push(VoronoiVertex::Outer(OuterType::Left, point));
                         vertices.insert(Point2(point.x, point.y));
+                        lb = Some(region_vertices.len());
                     }
                     else if let Some(point) = top.intercept_by_ray(dir, from)
                     {
-                        tb = true;
                         region_vertices.push(VoronoiVertex::Outer(OuterType::Top, point));
                         vertices.insert(Point2(point.x, point.y));
+                        tb = Some(region_vertices.len());
                     }
                     else if let Some(point) = right.intercept_by_ray(dir, from)
                     {
-                        rb = true;
                         region_vertices.push(VoronoiVertex::Outer(OuterType::Right, point));
                         vertices.insert(Point2(point.x, point.y));
+                        rb = Some(region_vertices.len());
                     }
                     else if let Some(point) = bot.intercept_by_ray(dir, from)
                     {
-                        bt = true;
                         region_vertices.push(VoronoiVertex::Outer(OuterType::Bottom, point));
                         vertices.insert(Point2(point.x, point.y));
+                        bb = Some(region_vertices.len());
                     } else {
                         panic!("should not happen");
                     }
+                    region_vertices.push(VoronoiVertex::Inner(Vec2::new(from.x, from.y)));
                 }
-                [_,_] => {}
+                [_,_] => {  }
             };
+            if i > 0 {
+                // region_vertices.push(region_vertices[region_vertices.len()-1].clone());
+            }
         }
-        if tb && !rb && !bt && lb {
-            region_vertices.push(VoronoiVertex::Outer(OuterType::TopLeftCorner, top.startp()));
-        } else if tb && rb && !bt && !lb {
-            region_vertices.push(VoronoiVertex::Outer(OuterType::TopRightCorner, right.startp()));
-        } else if !tb && rb && bt && !lb {
-            region_vertices.push(VoronoiVertex::Outer(OuterType::BottomRightCorner, bot.startp()));
-        } else if !tb && !rb && bt && lb {
-            region_vertices.push(VoronoiVertex::Outer(OuterType::BottomLeftCorner, left.startp()));
-        } else if tb && !rb && bt && !lb {
-            region_vertices.push(VoronoiVertex::Outer(OuterType::TopRightCorner, right.startp()));
-            region_vertices.push(VoronoiVertex::Outer(OuterType::BottomRightCorner, bot.startp()));
-        } else if !tb && rb && !bt && lb {
-            region_vertices.push(VoronoiVertex::Outer(OuterType::BottomRightCorner, bot.startp()));
-            region_vertices.push(VoronoiVertex::Outer(OuterType::BottomLeftCorner, left.startp()));
-        } else if tb && !rb && bt && !lb {
-            region_vertices.push(VoronoiVertex::Outer(OuterType::BottomLeftCorner, left.startp()));
-            region_vertices.push(VoronoiVertex::Outer(OuterType::TopLeftCorner, top.startp()));
-        } else if !tb && rb && !bt && lb {
-            region_vertices.push(VoronoiVertex::Outer(OuterType::TopLeftCorner, top.startp()));
-            region_vertices.push(VoronoiVertex::Outer(OuterType::TopRightCorner, right.startp()));
-        }
+        //
+        // if tb.is_some() && !rb.is_some() && !bb.is_some() && lb.is_some() {
+        //     let mut t_index = tb.unwrap();
+        //     let mut l_index = lb.unwrap();
+        //     region_vertices.insert(l_index,VoronoiVertex::Outer(OuterType::TopLeftCorner, top.startp()));
+        //     region_vertices.insert(t_index, VoronoiVertex::Outer(OuterType::TopLeftCorner, top.startp()));
+        // } else if tb.is_some() && rb.is_some() && !bb.is_some() && !lb.is_some() {
+        //     let mut t_index = tb.unwrap();
+        //     let mut r_index = rb.unwrap();
+        //     region_vertices.insert(r_index,VoronoiVertex::Outer(OuterType::TopRightCorner, right.startp()));
+        //     region_vertices.insert(t_index, VoronoiVertex::Outer(OuterType::TopRightCorner, right.startp()));
+        // } else if !tb.is_some() && rb.is_some() && bb.is_some() && !lb.is_some() {
+        //     let mut r_index = rb.unwrap();
+        //     let mut b_index = bb.unwrap();
+        //     region_vertices.insert(b_index,VoronoiVertex::Outer(OuterType::BottomRightCorner, bot.startp()));
+        //     region_vertices.insert(r_index, VoronoiVertex::Outer(OuterType::BottomRightCorner, bot.startp()));
+        // } else if !tb.is_some() && !rb.is_some() && bb.is_some() && lb.is_some() {
+        //     let mut b_index = bb.unwrap();
+        //     let mut l_index = lb.unwrap();
+        //     region_vertices.insert(b_index,VoronoiVertex::Outer(OuterType::BottomLeftCorner, left.startp()));
+        //     region_vertices.insert(l_index, VoronoiVertex::Outer(OuterType::BottomLeftCorner, left.startp()));
+        // } else if tb.is_some() && !rb.is_some() && bb.is_some() && !lb.is_some() {
+        //     let mut t_index = tb.unwrap();
+        //     let mut b_index = bb.unwrap();
+        //
+        //     region_vertices.push(VoronoiVertex::Outer(OuterType::TopRightCorner, right.startp()));
+        //     region_vertices.push(VoronoiVertex::Outer(OuterType::BottomRightCorner, bot.startp()));
+        // } else if !tb.is_some() && rb.is_some() && !bb.is_some() && lb.is_some() {
+        //     let mut r_index = rb.unwrap();
+        //     let mut l_index = lb.unwrap();
+        //     region_vertices.push(VoronoiVertex::Outer(OuterType::BottomRightCorner, bot.startp()));
+        //     region_vertices.push(VoronoiVertex::Outer(OuterType::BottomLeftCorner, left.startp()));
+        // } else if tb.is_some() && !rb.is_some() && bb.is_some() && !lb.is_some() {
+        //     let mut r_index = 0;
+        //     let mut l_index = 0;
+        //     region_vertices.push(VoronoiVertex::Outer(OuterType::BottomLeftCorner, left.startp()));
+        //     region_vertices.push(VoronoiVertex::Outer(OuterType::TopLeftCorner, top.startp()));
+        // } else if !tb.is_some() && rb.is_some() && !bb.is_some() && lb.is_some() {
+        //     region_vertices.push(VoronoiVertex::Outer(OuterType::TopLeftCorner, top.startp()));
+        //     region_vertices.push(VoronoiVertex::Outer(OuterType::TopRightCorner, right.startp()));
+        // }
         regions.push(VoronoiRegionBounded::new(Vec2::new(region_site.x, region_site.y), region_vertices));
     }
     println!("count={}, {:?}",vertices.len(), vertices);
     println!("region count={}", regions.len());
-    for region in regions {
+    for region in &regions {
         println!("{:?}",region);
     }
+    regions
 
 
     // for edge in triangulation.undirected_voronoi_edges() {

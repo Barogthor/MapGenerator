@@ -1,14 +1,14 @@
 use nalgebra_glm::Vec2;
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
 pub enum OuterType {
     Left, Top, Right, Bottom, TopLeftCorner, TopRightCorner, BottomRightCorner, BottomLeftCorner
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum VoronoiVertex {
     Inner(Vec2),
-    Outer(OuterType, Vec2,)
+    Outer(OuterType, Vec2)
 }
 
 #[derive(Debug)]
@@ -23,5 +23,13 @@ impl VoronoiRegionBounded {
             site,
             vertices,
         }
+    }
+
+    pub fn center(&self) -> Vec2 {
+        self.site
+    }
+
+    pub fn vertices(&self) -> &Vec<VoronoiVertex> {
+        &self.vertices
     }
 }

@@ -9,6 +9,7 @@ use glium::uniforms::{Uniforms, UniformValue};
 
 pub mod tick;
 pub mod voronoi;
+pub mod color;
 
 pub fn draw_params() -> DrawParameters<'static> {
     use glium::{Depth, DepthTest, BackfaceCullingMode};
@@ -52,6 +53,24 @@ impl Vertex {
 glium::implement_vertex!(Vertex, position, normal, tex_coords);
 
 
+#[derive(Copy, Clone, Debug)]
+pub struct VertexColor {
+    position: [f32; 3],
+    color: [f32; 3],
+}
+
+impl VertexColor {
+    pub fn new(x: f32, y: f32, z: f32, color: [f32; 3]) -> Self {
+        Self {
+            position: [x, y, z],
+            color,
+        }
+    }
+}
+
+glium::implement_vertex!(VertexColor, position, color);
+
+
 #[derive(Default, Clone)]
 pub struct UniformStorage<'a> (HashMap<String, UniformValue<'a>>);
 
@@ -83,7 +102,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             open_debug: false,
-            background_color: [0.0, 0.0, 0.0, 1.0],
+            background_color: [0.5, 0.9, 0.1, 1.0],
             frame_time: 0,
             quit: false,
         }

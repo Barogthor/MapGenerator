@@ -6,11 +6,13 @@ use glium::glutin::window::WindowBuilder;
 use glium::{IndexBuffer, Surface, VertexBuffer};
 use glium::uniforms::AsUniformValue;
 use image::{DynamicImage, GenericImage, GenericImageView, ImageBuffer};
-use MapGenerator::{draw_params, load_glsl, show_window, State, UniformStorage, Vertex};
+use MapGenerator::{draw_params, load_glsl, show_window, State, UniformStorage, Vertex, VertexColor};
+use MapGenerator::color::Colors;
 use MapGenerator::tick::{TICK_DRAW_ID, TICK_FRAME_ID, TICK_RENDER_EGUI_ID, TICK_RENDER_ID, TickSystem};
 use MapGenerator::voronoi::{basic_voronoi_example};
 use math::{Boundary, CameraSystem, Ortho, Perspective, RawMat4, TransformBuilder};
 use math::glm::{cross, normalize, Vec2, vec3};
+use math::voronoi::VoronoiVertex::{Inner, Outer};
 use ui::{Binding, Gesture, Input, LoopType};
 use ui::winit::dpi::PhysicalPosition;
 use ui::winit::event::{Event, StartCause};
@@ -30,8 +32,23 @@ const FOV_MAX: f32 = 0.785398f32;
 
 fn main() {
     let boundary = Boundary::from_top_left(Vec2::new(-10.0,10.0), 20., 20.);
-    basic_voronoi_example(boundary);
-    return;
+    let map = basic_voronoi_example(boundary);
+    let mut sites = vec![];
+    let mut voronoi_vertices = vec![];
+    for region in map {
+        let center = region.center();
+        sites.push(VertexColor::new(center.x, center.y, 0.0, Colors::RED.into()));
+        for vertex in region.vertices() {
+            match vertex {
+                Inner(pt) | Outer(_, pt) => {
+                    let v = VertexColor::new(pt.x, pt.y, 0.0, Colors::BLACK.into());
+                    voronoi_vertices.push(v);
+
+                }
+            }
+        }
+    }
+
     let mut camera_speed = 0.05f32;
     let z_axis = vec3(0.0, 0.0, 1.0f32);
     let y_axis = vec3(0.0, 1.0, 0.0f32);
@@ -52,10 +69,20 @@ fn main() {
     let mut input = Input::create();
     let binding = Binding::create();
 
-    let sample_vertex_src = load_glsl("resources/shaders/map.vs.glsl");
-    let sample_fragment_src = load_glsl("resources/shaders/map.fs.glsl");
-    let sample_program =
-        glium::Program::from_source(&display, &sample_vertex_src, &sample_fragment_src, None)
+    let map_vertex_src = load_glsl("resources/shaders/map.vs.glsl");
+    let map_fragment_src = load_glsl("resources/shaders/map.fs.glsl");
+    let map_program =
+        glium::Program::from_source(&display, &map_vertex_src, &map_fragment_src, None)
+            .unwrap();
+    let voronoi_site_vertex_src = load_glsl("resources/shaders/voronoi_site.vs.glsl");
+    let voronoi_site_fragment_src = load_glsl("resources/shaders/voronoi_site.fs.glsl");
+    let voronoi_site_program =
+        glium::Program::from_source(&display, &voronoi_site_vertex_src, &voronoi_site_fragment_src, None)
+            .unwrap();
+    let voronoi_wire_vertex_src = load_glsl("resources/shaders/voronoi_wire.vs.glsl");
+    let voronoi_wire_fragment_src = load_glsl("resources/shaders/voronoi_wire.fs.glsl");
+    let voronoi_wire_program =
+        glium::Program::from_source(&display, &voronoi_wire_vertex_src, &voronoi_wire_fragment_src, None)
             .unwrap();
 
     let square = [
@@ -66,10 +93,17 @@ fn main() {
     ];
     let square_vertexes = VertexBuffer::new(&display, &square).unwrap();
     let square_indexes = IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList, &[0, 1, 3, 3, 2, 0u16]).unwrap();
+    let site_vertexes = VertexBuffer::new(&display, &sites).unwrap();
+    let site_indexes = glium::index::NoIndices(glium::index::PrimitiveType::Points);
+    let voronoi_wire_vertexes = VertexBuffer::new(&display, &voronoi_vertices).unwrap();
+    let voronoi_wire_indexes = glium::index::NoIndices(glium::index::PrimitiveType::LinesList);
 
     let floor_model = TransformBuilder::new()
         .scale(20., 20., 20.)
         .translate(-0.50, -0.50, 0.0)
+        .build();
+
+    let map_model = TransformBuilder::new()
         .build();
 
     let mut map_image = {
@@ -155,15 +189,34 @@ fn main() {
 
             let view_pos: [f32; 3] = camera.pos.into();
             let view: RawMat4 = camera.view().into();
+            // {
+            //     let model = floor_model.get_raw();
+            //     let mut my_storage = UniformStorage::default();
+            //     my_storage.add("vp", pre_vp.as_uniform_value());
+            //     my_storage.add("view", view.as_uniform_value());
+            //     my_storage.add("model", model.as_uniform_value());
+            //     my_storage.add("viewPos", view_pos.as_uniform_value());
+            //     my_storage.add("tex", map_tex.as_uniform_value());
+            //     frame.draw(&square_vertexes, &square_indexes, &map_program, &my_storage, &draw_params).unwrap();
+            // }
+
             {
-                let model = floor_model.get_raw();
-                let mut my_storage = UniformStorage::default();
+                let model = map_model.get_raw();
+                let mut my_storage =  UniformStorage::default();
                 my_storage.add("vp", pre_vp.as_uniform_value());
                 my_storage.add("view", view.as_uniform_value());
                 my_storage.add("model", model.as_uniform_value());
                 my_storage.add("viewPos", view_pos.as_uniform_value());
-                my_storage.add("tex", map_tex.as_uniform_value());
-                frame.draw(&square_vertexes, &square_indexes, &sample_program, &my_storage, &draw_params).unwrap();
+                frame.draw(&site_vertexes, &site_indexes, &voronoi_site_program, &my_storage, &draw_params).unwrap();
+            }
+            {
+                let model = map_model.get_raw();
+                let mut my_storage =  UniformStorage::default();
+                my_storage.add("vp", pre_vp.as_uniform_value());
+                my_storage.add("view", view.as_uniform_value());
+                my_storage.add("model", model.as_uniform_value());
+                my_storage.add("viewPos", view_pos.as_uniform_value());
+                frame.draw(&voronoi_wire_vertexes, &voronoi_wire_indexes, &voronoi_wire_program, &my_storage, &draw_params).unwrap();
             }
 
             tick_system.start_tick(TICK_RENDER_EGUI_ID);
@@ -224,7 +277,7 @@ fn main() {
 
                 if step.y != 0. || step.x != 0. {
                     camera.pos += vec3(step.x, step.y, 0.0) * camera_speed;
-                    println!("{}", camera.pos);
+                    // println!("{}", camera.pos);
                 }
             }
             input.tick_reset();

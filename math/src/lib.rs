@@ -228,6 +228,16 @@ impl Segment {
     pub fn endp(&self) -> Vec2 {
         self.b
     }
+
+    pub fn point_closer_to_start(&self, pt: Vec2) -> bool {
+        let ab = (self.b - self.a).norm_squared();
+        let ap = (pt - self.a).norm_squared();
+        (ab - ap) / ab <= 0.5
+    }
+
+    pub fn point_closer_to_end(&self, pt: Vec2) -> bool {
+        !self.point_closer_to_end(pt)
+    }
 }
 
 #[inline]
