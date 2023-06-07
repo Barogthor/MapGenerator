@@ -10,6 +10,10 @@ pub type RawMat4 = [[f32; 4]; 4];
 pub fn float_eq(value: f32, compared: f32, epsilon: f32) -> bool {
     (value - compared).abs() <= epsilon
 }
+#[inline]
+pub fn to_radians(degree: f32) -> f32 {
+    degree.to_radians()
+}
 
 
 pub struct Perspective{

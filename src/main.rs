@@ -20,12 +20,6 @@ use ui::winit::dpi::PhysicalPosition;
 use ui::winit::event::{Event, StartCause};
 use ui::winit::event_loop::ControlFlow;
 
-// compared € [to_compare - epsilon; to_compare + epsilon]
-#[inline]
-fn to_radians(degree: f32) -> f32 {
-    degree.to_radians()
-}
-
 const PITCH_MAX: f32 = 1.55334f32;
 const WIDTH: f32 = 1920f32;
 const HEIGHT: f32 = 1080f32;
@@ -58,10 +52,6 @@ fn main() {
         }
     }
     let mut camera_speed = 0.05f32;
-    let z_axis = vec3(0.0, 0.0, 1.0f32);
-    let y_axis = vec3(0.0, 1.0, 0.0f32);
-    let x_axis = vec3(1.0, 0.0, 0.0f32);
-    let custom_axis = vec3(1.0, 0.3, 0.5f32);
     let draw_params = draw_params();
     let mut tick_system = TickSystem::new();
     tick_system.register_listener(TICK_FRAME_ID);
@@ -93,77 +83,21 @@ fn main() {
         glium::Program::from_source(&display, &voronoi_wire_vertex_src, &voronoi_wire_fragment_src, None)
             .unwrap();
 
-    let square = [
-        Vertex::new(0.0, 0.0, 0.0, [0.0, 0.0, 1.0], [1.0, 0.0]),
-        Vertex::new(1.0, 0.0, 0.0, [0.0, 0.0, 1.0], [1.0, 1.0]),
-        Vertex::new(0.0, 1.0, 0.0, [0.0, 0.0, 1.0], [0.0, 0.0]),
-        Vertex::new(1.0, 1.0, 0.0, [0.0, 0.0, 1.0], [0.0, 1.0])
-    ];
-    let square_vertexes = VertexBuffer::new(&display, &square).unwrap();
-    let square_indexes = IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList, &[0, 1, 3, 3, 2, 0u16]).unwrap();
     let site_vertexes = VertexBuffer::new(&display, &sites).unwrap();
     let site_indexes = glium::index::NoIndices(glium::index::PrimitiveType::Points);
     let voronoi_wire_vertexes = VertexBuffer::new(&display, &voronoi_wires).unwrap();
     let voronoi_wire_indexes = glium::index::NoIndices(glium::index::PrimitiveType::LinesList);
 
-    let floor_model = TransformBuilder::new()
-        .scale(20., 20., 20.)
-        .translate(-0.50, -0.50, 0.0)
-        .build();
-
     let map_model = TransformBuilder::new()
         .scale(0.5,0.5,0.5)
         .build();
-
-    let mut map_image = {
-        let imgx = 512;
-        let imgy = 512;
-        let scalex = 3.0 / imgx as f32;
-        let scaley = 3.0 / imgy as f32;
-        // let mut imgbuf = DynamicImage::new_rgb8(imgx, imgy);
-        let mut imgbuf = ImageBuffer::new(imgx, imgy);
-        for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
-            let r = (0.3 * x as f32) as u8;
-            let b = (0.3 * y as f32) as u8;
-            *pixel = image::Rgb([r, 0, b]);
-        };
-        for x in 0..imgx {
-            for y in 0..imgy {
-                let cx = y as f32 * scalex - 1.5;
-                let cy = x as f32 * scaley - 1.5;
-
-                let c = num_complex::Complex::new(-0.4, 0.6);
-                let mut z = num_complex::Complex::new(cx, cy);
-
-                let mut i = 0;
-                while i < 255 && z.norm() <= 2.0 {
-                    z = z * z + c;
-                    i += 1;
-                }
-
-                let pixel = imgbuf.get_pixel(x, y);
-                let data = (*pixel as image::Rgb<u8>).0;
-                // imgbuf.put_pixel(x, y, image::Rgba([data[0], i as u8, data[2], 1.0]));
-                imgbuf.put_pixel(x, y, image::Rgb([data[0], i as u8, data[2]]));
-            }
-        }
-        // imgbuf
-        DynamicImage::from(imgbuf).to_rgba8()
-    };
-    let map_tex = {
-        let image_dimensions = map_image.dimensions();
-        let image =
-            glium::texture::RawImage2d::from_raw_rgba_reversed(&map_image.into_raw(), image_dimensions);
-        let tex = glium::texture::Texture2d::new(&display, image).unwrap();
-        tex
-    };
 
     let mut camera = CameraSystem::default();
     let (mut w, mut h) = (display.get_framebuffer_dimensions().0, display.get_framebuffer_dimensions().1);
     let mut perspective = Ortho::default();
     let vp = perspective.get() * &camera.view();
     let mut pre_vp: RawMat4 = vp.into();
-    let (mut yaw, mut pitch) = (FRAC_PI_2 * 2., 0.0);
+    // let (mut yaw, mut pitch) = (FRAC_PI_2 * 2., 0.0);
     let mut state = State::default();
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -185,7 +119,7 @@ fn main() {
 
             show_window(&mut egui, &mut state);
 
-            let (needs_repaint, shapes) = egui.end_frame(&display);
+            let (_needs_repaint, shapes) = egui.end_frame(&display);
 
 
             let mut frame = display.draw();
@@ -194,21 +128,8 @@ fn main() {
                 (c[0], c[1], c[2], c[3])
             };
             frame.clear_color_and_depth(bgc, 1.);
-
-
             let view_pos: [f32; 3] = camera.pos.into();
             let view: RawMat4 = camera.view().into();
-            // {
-            //     let model = floor_model.get_raw();
-            //     let mut my_storage = UniformStorage::default();
-            //     my_storage.add("vp", pre_vp.as_uniform_value());
-            //     my_storage.add("view", view.as_uniform_value());
-            //     my_storage.add("model", model.as_uniform_value());
-            //     my_storage.add("viewPos", view_pos.as_uniform_value());
-            //     my_storage.add("tex", map_tex.as_uniform_value());
-            //     frame.draw(&square_vertexes, &square_indexes, &map_program, &my_storage, &draw_params).unwrap();
-            // }
-
             {
                 let model = map_model.get_raw();
                 let mut my_storage =  UniformStorage::default();
