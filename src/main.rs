@@ -12,6 +12,8 @@ use MapGenerator::tick::{TICK_DRAW_ID, TICK_FRAME_ID, TICK_RENDER_EGUI_ID, TICK_
 use MapGenerator::voronoi::{basic_voronoi_example};
 use math::{Boundary, CameraSystem, Ortho, Perspective, RawMat4, TransformBuilder};
 use math::glm::{cross, normalize, Vec2, vec3};
+use math::spade::Triangulation;
+use math::voronoi::generate_random_points;
 use math::voronoi::VoronoiVertex::{Inner, Outer};
 use ui::{Binding, Gesture, Input, LoopType};
 use ui::winit::dpi::PhysicalPosition;
@@ -31,10 +33,18 @@ const FOV_MIN: f32 = 0.0174533f32;
 const FOV_MAX: f32 = 0.785398f32;
 
 fn main() {
-    let boundary = Boundary::from_top_left(Vec2::new(-10.0,10.0), 20., 20.);
+    let boundary = Boundary::from_top_left(Vec2::new(-30.0,30.0), 60., 60.);
+    let mut voronoi_wires = vec![];
+    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 0.0, Colors::BLUE.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 0.0, Colors::BLUE.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 0.0, Colors::BLUE.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 0.0, Colors::BLUE.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 0.0, Colors::BLUE.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 0.0, Colors::BLUE.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 0.0, Colors::BLUE.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 0.0, Colors::BLUE.into()));
     let map = basic_voronoi_example(boundary);
     let mut sites = vec![];
-    let mut voronoi_vertices = vec![];
     for region in map {
         let center = region.center();
         sites.push(VertexColor::new(center.x, center.y, 0.0, Colors::RED.into()));
@@ -42,13 +52,11 @@ fn main() {
             match vertex {
                 Inner(pt) | Outer(_, pt) => {
                     let v = VertexColor::new(pt.x, pt.y, 0.0, Colors::BLACK.into());
-                    voronoi_vertices.push(v);
-
+                    voronoi_wires.push(v);
                 }
             }
         }
     }
-
     let mut camera_speed = 0.05f32;
     let z_axis = vec3(0.0, 0.0, 1.0f32);
     let y_axis = vec3(0.0, 1.0, 0.0f32);
@@ -95,7 +103,7 @@ fn main() {
     let square_indexes = IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList, &[0, 1, 3, 3, 2, 0u16]).unwrap();
     let site_vertexes = VertexBuffer::new(&display, &sites).unwrap();
     let site_indexes = glium::index::NoIndices(glium::index::PrimitiveType::Points);
-    let voronoi_wire_vertexes = VertexBuffer::new(&display, &voronoi_vertices).unwrap();
+    let voronoi_wire_vertexes = VertexBuffer::new(&display, &voronoi_wires).unwrap();
     let voronoi_wire_indexes = glium::index::NoIndices(glium::index::PrimitiveType::LinesList);
 
     let floor_model = TransformBuilder::new()
@@ -104,6 +112,7 @@ fn main() {
         .build();
 
     let map_model = TransformBuilder::new()
+        .scale(0.5,0.5,0.5)
         .build();
 
     let mut map_image = {

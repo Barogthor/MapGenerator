@@ -19,6 +19,7 @@ pub fn draw_params() -> DrawParameters<'static> {
             write: true,
             ..Depth::default()
         },
+        point_size: Some(5.),
         backface_culling: BackfaceCullingMode::CullClockwise,
         ..DrawParameters::default()
     }
