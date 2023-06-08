@@ -1,9 +1,9 @@
 #version 330 core
 
 in vec3 position;
-in vec2 tex_coords;
+in vec3 color;
 
-out vec2 TexCoords;
+out vec3 oColor;
 
 uniform mat4 vp;
 uniform mat4 model;
@@ -11,5 +11,5 @@ uniform mat4 model;
 void main() {
     gl_Position = vp * model * vec4(position, 1.0);
 
-    TexCoords = tex_coords;
+    oColor = color;
 }

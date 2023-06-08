@@ -4,6 +4,8 @@ pub use rand;
 pub use spade;
 pub mod delaunay;
 pub mod voronoi;
+pub mod map;
+pub mod color;
 
 pub type RawMat4 = [[f32; 4]; 4];
 #[inline]
@@ -240,7 +242,7 @@ impl Segment {
     }
 
     pub fn point_closer_to_end(&self, pt: Vec2) -> bool {
-        !self.point_closer_to_end(pt)
+        !self.point_closer_to_start(pt)
     }
 }
 

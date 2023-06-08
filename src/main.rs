@@ -1,22 +1,18 @@
-use std::f32::consts::{FRAC_PI_2, PI};
 use egui_glium::EguiGlium;
 use glium::glutin::dpi::{PhysicalSize, Size};
 use glium::glutin::GlProfile;
 use glium::glutin::window::WindowBuilder;
-use glium::{IndexBuffer, Surface, VertexBuffer};
+use glium::{Surface, VertexBuffer};
 use glium::uniforms::AsUniformValue;
-use image::{DynamicImage, GenericImage, GenericImageView, ImageBuffer};
 use MapGenerator::{draw_params, load_glsl, show_window, State, UniformStorage, Vertex, VertexColor};
-use MapGenerator::color::Colors;
 use MapGenerator::tick::{TICK_DRAW_ID, TICK_FRAME_ID, TICK_RENDER_EGUI_ID, TICK_RENDER_ID, TickSystem};
-use MapGenerator::voronoi::{basic_voronoi_example};
-use math::{Boundary, CameraSystem, Ortho, Perspective, RawMat4, TransformBuilder};
-use math::glm::{cross, normalize, Vec2, vec3};
-use math::spade::Triangulation;
-use math::voronoi::generate_random_points;
+use math::map::{new_map, Map};
+use math::voronoi::{VoronoiRegion, VoronoiVertex};
+use math::color::Colors;
+use math::{Boundary, CameraSystem, Ortho, RawMat4, TransformBuilder};
+use math::glm::{Vec2, vec3};
 use math::voronoi::VoronoiVertex::{Inner, Outer};
 use ui::{Binding, Gesture, Input, LoopType};
-use ui::winit::dpi::PhysicalPosition;
 use ui::winit::event::{Event, StartCause};
 use ui::winit::event_loop::ControlFlow;
 
@@ -26,31 +22,58 @@ const HEIGHT: f32 = 1080f32;
 const FOV_MIN: f32 = 0.0174533f32;
 const FOV_MAX: f32 = 0.785398f32;
 
+fn extract_region_mesh(map: &Map) -> Vec<VertexColor> {
+    let mut meshes_vertices = vec![];
+    for region in map.get_regions() {
+        let site = region.site;
+        let region_vertices = &region.vertices;
+        for (i, vertice) in region_vertices.iter().enumerate() {
+            let v2_index = (i+1) % (region_vertices.len()-1);
+            let v1 = match vertice {
+                VoronoiVertex::Inner(pt) | VoronoiVertex::Outer(_, pt) => {
+                    *pt
+                }
+            };
+            let v2 = match region_vertices[v2_index] {
+                VoronoiVertex::Inner(pt) | VoronoiVertex::Outer(_, pt) => {
+                    *pt
+                }
+            };
+            meshes_vertices.push(VertexColor::new(site.x, site.y, 0.0, region.color.into()));
+            meshes_vertices.push(VertexColor::new(v1.x, v1.y, 0.0, region.color.into()));
+            meshes_vertices.push(VertexColor::new(v2.x, v2.y, 0.0, region.color.into()));
+        }
+    }
+    meshes_vertices
+}
+
 fn main() {
     let boundary = Boundary::from_top_left(Vec2::new(-30.0,30.0), 60., 60.);
     let mut voronoi_wires = vec![];
-    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 0.0, Colors::BLUE.into()));
-    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 0.0, Colors::BLUE.into()));
-    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 0.0, Colors::BLUE.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 0.0, Colors::BLUE.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 0.0, Colors::BLUE.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 0.0, Colors::BLUE.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 0.0, Colors::BLUE.into()));
-    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 0.0, Colors::BLUE.into()));
-    let map = basic_voronoi_example(boundary);
+    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 1.0, Colors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 1.0, Colors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 1.0, Colors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 1.0, Colors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 1.0, Colors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 1.0, Colors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 1.0, Colors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 1.0, Colors::TEAL.into()));
+    // let map = basic_voronoi_example(boundary);
+    let map = new_map(boundary);
     let mut sites = vec![];
-    for region in map {
-        let center = region.center();
-        sites.push(VertexColor::new(center.x, center.y, 0.0, Colors::RED.into()));
-        for vertex in region.vertices() {
+    for region in map.get_regions() {
+        let site = region.site;
+        sites.push(VertexColor::new(site.x, site.y, 1.0, Colors::RED.into()));
+        for vertex in &region.vertices {
             match vertex {
                 Inner(pt) | Outer(_, pt) => {
-                    let v = VertexColor::new(pt.x, pt.y, 0.0, Colors::BLACK.into());
+                    let v = VertexColor::new(pt.x, pt.y, 1.0, Colors::BLACK.into());
                     voronoi_wires.push(v);
                 }
             }
         }
     }
+    let region_vertexes = extract_region_mesh(&map);
     let mut camera_speed = 0.05f32;
     let draw_params = draw_params();
     let mut tick_system = TickSystem::new();
@@ -83,6 +106,9 @@ fn main() {
         glium::Program::from_source(&display, &voronoi_wire_vertex_src, &voronoi_wire_fragment_src, None)
             .unwrap();
 
+
+    let region_vertexes = VertexBuffer::new(&display, &region_vertexes).unwrap();
+    let region_indexes = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
     let site_vertexes = VertexBuffer::new(&display, &sites).unwrap();
     let site_indexes = glium::index::NoIndices(glium::index::PrimitiveType::Points);
     let voronoi_wire_vertexes = VertexBuffer::new(&display, &voronoi_wires).unwrap();
@@ -131,6 +157,14 @@ fn main() {
             let view_pos: [f32; 3] = camera.pos.into();
             let view: RawMat4 = camera.view().into();
             {
+                let model = map_model.get_raw();
+                let mut my_storage =  UniformStorage::default();
+                my_storage.add("vp", pre_vp.as_uniform_value());
+                my_storage.add("view", view.as_uniform_value());
+                my_storage.add("model", model.as_uniform_value());
+                my_storage.add("viewPos", view_pos.as_uniform_value());
+                frame.draw(&region_vertexes, &region_indexes, &map_program, &my_storage, &draw_params).unwrap();
+            }{
                 let model = map_model.get_raw();
                 let mut my_storage =  UniformStorage::default();
                 my_storage.add("vp", pre_vp.as_uniform_value());

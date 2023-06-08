@@ -1,4 +1,8 @@
+use crate::delaunay::{CsTriangulation, VertexType};
 use nalgebra_glm::Vec2;
+use crate::spade::{FloatTriangulation, InsertionError, Triangulation};
+use crate::spade::handles::VoronoiVertex::{Inner, Outer};
+use crate::{Boundary};
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
 pub enum OuterType {
@@ -12,12 +16,12 @@ pub enum VoronoiVertex {
 }
 
 #[derive(Debug)]
-pub struct VoronoiRegionBounded {
-    site: Vec2,
-    vertices: Vec<VoronoiVertex>
+pub struct VoronoiRegion {
+    pub(crate) site: Vec2,
+    pub(crate) vertices: Vec<VoronoiVertex>
 }
 
-impl VoronoiRegionBounded {
+impl VoronoiRegion {
     pub fn new(site: Vec2, vertices: Vec<VoronoiVertex>) -> Self {
         Self {
             site,
@@ -25,30 +29,11 @@ impl VoronoiRegionBounded {
         }
     }
 
-    pub fn center(&self) -> Vec2 {
+    pub fn site(&self) -> Vec2 {
         self.site
     }
 
     pub fn vertices(&self) -> &Vec<VoronoiVertex> {
         &self.vertices
     }
-}
-
-pub fn generate_random_points() -> Vec<Vec2>{
-    let GRIDSIZE = 64;
-    let HALF_GRID = GRIDSIZE / 2;
-    let JITTER = 0.5f32;
-
-    let mut points = vec![];
-
-    for x in -HALF_GRID..HALF_GRID {
-        for y in -HALF_GRID..HALF_GRID {
-            let x = x as f32;
-            let y = y as f32;
-            let x_displace = JITTER * (rand::random::<f32>() - rand::random::<f32>());
-            let y_displace = JITTER * (rand::random::<f32>() - rand::random::<f32>());
-            points.push(Vec2::new(x + x_displace, y + y_displace));
-        }
-    }
-    points
 }

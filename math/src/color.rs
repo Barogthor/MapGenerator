@@ -1,5 +1,3 @@
-use glium::uniforms::{AsUniformValue, UniformValue};
-
 #[derive(Clone, PartialOrd, PartialEq, Debug, Copy)]
 pub enum Colors {
     RED,
@@ -57,12 +55,5 @@ impl From<Colors> for [f32; 4] {
     fn from(color: Colors) -> Self {
         let color = color.to_tuple();
         [color.0 as f32 / 255., color.1 as f32 / 255., color.2 as f32 / 255., color.3 as f32 / 255.]
-    }
-}
-
-impl AsUniformValue for Colors {
-    fn as_uniform_value(&self) -> UniformValue<'_> {
-        let color = self.to_tuple();
-        UniformValue::Vec4([color.0 as f32 / 255., color.1 as f32 / 255., color.2 as f32 / 255., color.3 as f32 / 255.])
     }
 }

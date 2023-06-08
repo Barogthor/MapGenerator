@@ -6,10 +6,9 @@ use egui_glium::EguiGlium;
 use egui::Window as DWindow;
 use glium::DrawParameters;
 use glium::uniforms::{Uniforms, UniformValue};
+use math::color::Colors;
 
 pub mod tick;
-pub mod voronoi;
-pub mod color;
 
 pub fn draw_params() -> DrawParameters<'static> {
     use glium::{Depth, DepthTest, BackfaceCullingMode};
@@ -103,7 +102,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             open_debug: false,
-            background_color: [0.5, 0.9, 0.1, 1.0],
+            background_color: Colors::BLACK.into(),
             frame_time: 0,
             quit: false,
         }
