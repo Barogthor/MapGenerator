@@ -1,4 +1,4 @@
-use MapGenerator::pipeline::SitePipeline;
+use MapGenerator::pipeline::{SitePipeline, WirePipeline};
 use egui_glium::EguiGlium;
 use glium::glutin::dpi::{PhysicalSize, Size};
 use glium::glutin::GlProfile;
@@ -111,11 +111,8 @@ fn main() {
 
     let region_vertexes = VertexBuffer::new(&display, &region_vertexes).unwrap();
     let region_indexes = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
-    let site_vertexes = VertexBuffer::new(&display, &sites).unwrap();
-    let site_indexes = glium::index::NoIndices(glium::index::PrimitiveType::Points);
-    let voronoi_wire_vertexes = VertexBuffer::new(&display, &voronoi_wires).unwrap();
-    let voronoi_wire_indexes = glium::index::NoIndices(glium::index::PrimitiveType::LinesList);
     let site_pipeline = SitePipeline::new(sites, &display, voronoi_site_program);
+    let wire_pipeline = WirePipeline::new(voronoi_wires, &display, voronoi_wire_program);
 
     let map_model = TransformBuilder::new()
         .scale(0.5,0.5,0.5)
@@ -185,7 +182,7 @@ fn main() {
                 my_storage.add("view", view.as_uniform_value());
                 my_storage.add("model", model.as_uniform_value());
                 my_storage.add("viewPos", view_pos.as_uniform_value());
-                frame.draw(&voronoi_wire_vertexes, &voronoi_wire_indexes, &voronoi_wire_program, &my_storage, &draw_params).unwrap();
+                wire_pipeline.draw(&mut frame, &my_storage, &draw_params).unwrap();
             }
 
             tick_system.start_tick(TICK_RENDER_EGUI_ID);
