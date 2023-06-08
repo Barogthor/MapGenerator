@@ -9,7 +9,7 @@ use MapGenerator::tick::{TICK_DRAW_ID, TICK_FRAME_ID, TICK_RENDER_EGUI_ID, TICK_
 use math::map::{new_map, Map};
 use math::voronoi::{VoronoiRegion, VoronoiVertex};
 use math::color::Colors;
-use math::{Boundary, CameraSystem, Ortho, RawMat4, TransformBuilder};
+use math::{Boundary, CameraSystem, Ortho, RawMat4, TransformBuilder, float_eq};
 use math::glm::{Vec2, vec3};
 use math::voronoi::VoronoiVertex::{Inner, Outer};
 use ui::{Binding, Gesture, Input, LoopType};
@@ -48,6 +48,7 @@ fn extract_region_mesh(map: &Map) -> Vec<VertexColor> {
 }
 
 fn main() {
+    let mut zoom_factor = 0.0;
     let boundary = Boundary::from_top_left(Vec2::new(-30.0,30.0), 60., 60.);
     let mut voronoi_wires = vec![];
     voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 1.0, Colors::TEAL.into()));
@@ -164,7 +165,8 @@ fn main() {
                 my_storage.add("model", model.as_uniform_value());
                 my_storage.add("viewPos", view_pos.as_uniform_value());
                 frame.draw(&region_vertexes, &region_indexes, &map_program, &my_storage, &draw_params).unwrap();
-            }{
+            }
+            if state.show_sites {
                 let model = map_model.get_raw();
                 let mut my_storage =  UniformStorage::default();
                 my_storage.add("vp", pre_vp.as_uniform_value());
@@ -221,15 +223,14 @@ fn main() {
             //     camera.front = direction.normalize();
             //     // light_spot.direction.data = direction.normalize();
             // }
-            // let step = input.poll_analog2d(&binding.scroll);
-            // if !float_eq(step.y, 0.0, 1e-3) {
-            //     perspective.fov -= step.y;
-            //     if perspective.fov < FOV_MIN {
-            //         perspective.fov = FOV_MIN;
-            //     } else if perspective.fov > FOV_MAX {
-            //         perspective.fov = FOV_MAX;
-            //     }
-            // }
+            let step = input.poll_analog2d(&binding.scroll);
+            if !float_eq(step.y, 0.0, 1e-3) {
+                let future_zoom = zoom_factor - step.y*10.;
+                if future_zoom > -5. && future_zoom < 10. {
+                    zoom_factor=future_zoom;
+                    perspective.zoom(-step.y*10.);
+                }
+            }
 
             if input.poll_gesture(&binding.speedup) { camera_speed += 0.05; }
             if input.poll_gesture(&binding.speeddown) && camera_speed > 0.1 { camera_speed -= 0.05; }

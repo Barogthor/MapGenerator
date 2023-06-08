@@ -55,6 +55,12 @@ impl Ortho {
     pub fn get(&self) -> glm::Mat4 {
         glm::ortho(self.left, self.right, self.bottom, self.top, self.near, self.far)
     }
+    pub fn zoom(&mut self, k : f32) {
+        self.left-=k;
+        self.right+=k;
+        self.top+=k;
+        self.bottom-=k;
+    }
 }
 
 impl Default for Ortho {

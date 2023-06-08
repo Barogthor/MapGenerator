@@ -96,15 +96,17 @@ pub struct State {
     pub background_color: [f32; 4],
     pub frame_time: u128,
     pub quit: bool,
+    pub show_sites: bool,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
             open_debug: false,
-            background_color: Colors::BLACK.into(),
+            background_color: Colors::Other(40, 40, 40, 255).into(),
             frame_time: 0,
             quit: false,
+            show_sites: false,
         }
     }
 }
@@ -121,6 +123,8 @@ fn show_widgets(ui: &mut Ui, state: &mut State) {
     ui.add(label("Background"));
     ui.color_edit_button_rgba_premultiplied(&mut state.background_color);
     ui.end_row();
+
+    ui.checkbox(&mut state.show_sites, "Show sites");
 }
 
 pub fn show_window(egui: &mut EguiGlium, state: &mut State) {
