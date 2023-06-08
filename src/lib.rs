@@ -9,6 +9,7 @@ use glium::uniforms::{Uniforms, UniformValue};
 use math::color::PresetColors;
 
 pub mod tick;
+pub mod pipeline;
 
 pub fn draw_params() -> DrawParameters<'static> {
     use glium::{Depth, DepthTest, BackfaceCullingMode};

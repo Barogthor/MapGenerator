@@ -1,3 +1,4 @@
+use MapGenerator::pipeline::SitePipeline;
 use egui_glium::EguiGlium;
 use glium::glutin::dpi::{PhysicalSize, Size};
 use glium::glutin::GlProfile;
@@ -114,6 +115,7 @@ fn main() {
     let site_indexes = glium::index::NoIndices(glium::index::PrimitiveType::Points);
     let voronoi_wire_vertexes = VertexBuffer::new(&display, &voronoi_wires).unwrap();
     let voronoi_wire_indexes = glium::index::NoIndices(glium::index::PrimitiveType::LinesList);
+    let site_pipeline = SitePipeline::new(sites, &display, voronoi_site_program);
 
     let map_model = TransformBuilder::new()
         .scale(0.5,0.5,0.5)
@@ -173,7 +175,8 @@ fn main() {
                 my_storage.add("view", view.as_uniform_value());
                 my_storage.add("model", model.as_uniform_value());
                 my_storage.add("viewPos", view_pos.as_uniform_value());
-                frame.draw(&site_vertexes, &site_indexes, &voronoi_site_program, &my_storage, &draw_params).unwrap();
+                site_pipeline.draw(&mut frame, &my_storage, &draw_params).unwrap();
+                // frame.draw(&site_vertexes, &site_indexes, &voronoi_site_program, &my_storage, &draw_params).unwrap();
             }
             {
                 let model = map_model.get_raw();
