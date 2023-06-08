@@ -83,7 +83,7 @@ fn main() {
     tick_system.register_listener(TICK_RENDER_ID);
     let event_loop: LoopType = LoopType::new();
     let wb = WindowBuilder::new()
-        .with_title("3D Playground")
+        .with_title("Map generation")
         .with_inner_size(Size::Physical(PhysicalSize::new(WIDTH as u32, HEIGHT as u32)));
     let cb = glium::glutin::ContextBuilder::new().with_gl_profile(GlProfile::Core);
     let display = glium::Display::new(wb, cb, &event_loop).unwrap();

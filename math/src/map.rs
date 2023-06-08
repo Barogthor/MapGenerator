@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{delaunay::{CsTriangulation, VertexType}, Boundary, voronoi::{VoronoiVertex, VoronoiRegion}, color::{PresetColors, HSL}};
+use crate::{delaunay::{CsTriangulation, VertexType}, Boundary, voronoi::{VoronoiVertex, VoronoiRegion}, color::{PresetColors, HSL, RGB}};
 use nalgebra_glm::Vec2;
 use crate::spade::{FloatTriangulation, InsertionError, Triangulation};
 use spade::handles::VoronoiVertex::{Inner, Outer};
@@ -29,15 +29,12 @@ pub fn new_map(boundary: Boundary) -> Map
     let triangulation = init_rand_points().unwrap();
     let mut regions = extract_voronoi_regions(&triangulation, &boundary);
     let elevation_map = assign_elevation_map(&regions);
+    let moisture_map = assign_moisture_map(&regions);
     let mut map_regions = vec![];
     for (i, region) in regions.into_iter().enumerate() {
         let elevation = elevation_map[i];
-        let color = if elevation < 0.5 {
-            HSL::new(240, 0.3, 0.5)
-        } else {
-            HSL::new(90, 0.2, 0.5)
-        };
-        let mapr = MapRegion{site: region.site, vertices: region.vertices, color: color.to_rgb().into()  };
+        let color = get_biome_color(elevation_map[i], moisture_map[i]);
+        let mapr = MapRegion{site: region.site, vertices: region.vertices, color: color.into()  };
         map_regions.push(mapr);
     }
     
@@ -138,4 +135,49 @@ fn assign_elevation_map(regions: &Vec<VoronoiRegion>) -> Vec<f32> {
         elevation_map.push((1. + elevation - d) / 2.);
     }
     elevation_map
+}
+
+fn assign_moisture_map(regions: &Vec<VoronoiRegion>) -> Vec<f32> {
+    let wave_length = 0.5;
+    let mut noise = FastNoise::seeded(rand::random::<u64>());
+    let GRID_SIZE = 64.;
+    noise.set_noise_type(NoiseType::Simplex);
+    noise.set_fractal_type(FractalType::FBM);
+    noise.set_fractal_octaves(5);
+    noise.set_fractal_gain(0.6);
+    noise.set_fractal_lacunarity(2.0);
+    noise.set_frequency(2.0);
+    let mut moisture_map = vec![];
+    for (i, region) in regions.iter().enumerate() {
+        let nx = region.site().x / GRID_SIZE - 0.5;
+        let ny = region.site().y / GRID_SIZE - 0.5;
+        
+        let n = noise.get_noise(nx / wave_length, ny / wave_length);
+        let m = (1. - n) / 2.;
+        moisture_map.push(m);
+    }
+    moisture_map
+}
+
+fn get_biome_color(elevation: f32, moisture: f32) -> RGB {
+    let elevation = (elevation - 0.5) * 2.;
+    if elevation < 0. {
+        let r = 48. + 48.*elevation;
+        let g =  64. + 64.*elevation;
+        let b = 127.+127.*elevation;
+        RGB::new_f32(r / 255., g /255., b /255.)
+    } else {
+        let moisture = moisture * ( 1. - elevation);
+        let elevation = elevation.powi(4);
+        let (r, g, b) = {
+            let r = 210. -  100. * moisture;
+            let g =  185. -  45. * moisture;
+            let b = 139. - 45. * moisture;
+            let r = 255. * elevation +  r * (1. - elevation);
+            let g = 255. * elevation +  g * (1. - elevation);
+            let b = 255. * elevation +  b * (1. - elevation);
+            (r,g,b)
+        };
+        RGB::new_f32(r / 255., g / 255., b / 255.)
+    }
 }

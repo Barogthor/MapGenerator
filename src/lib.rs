@@ -18,7 +18,7 @@ pub fn draw_params() -> DrawParameters<'static> {
             write: true,
             ..Depth::default()
         },
-        point_size: Some(5.),
+        point_size: Some(3.),
         backface_culling: BackfaceCullingMode::CullClockwise,
         ..DrawParameters::default()
     }
@@ -130,17 +130,13 @@ fn show_widgets(ui: &mut Ui, state: &mut State) {
 pub fn show_window(egui: &mut EguiGlium, state: &mut State) {
     TopBottomPanel::top("my_top_bar").show(egui.ctx(), |ui| {
         ui.with_layout(Layout::left_to_right(), |ui| {
-            ui.add(label("Hello world"));
-            if ui.button("New window").clicked() {
-                state.open_debug = true;
+            if ui.button("Generate").clicked() {
+                // state.quit = true;
             }
         });
     });
     SidePanel::left("my_side_panel").min_width(150.).show(egui.ctx(), |ui| {
-        ui.heading("Hello World!");
-        if ui.button("Quit").clicked() {
-            state.quit = true;
-        }
+
 
         Grid::new("my_grid")
             .num_columns(2)
@@ -150,9 +146,4 @@ pub fn show_window(egui: &mut EguiGlium, state: &mut State) {
                 show_widgets(ui, state);
             });
     });
-    if state.open_debug {
-        DWindow::new("Debug Window").min_width(150.).open(&mut state.open_debug).show(egui.ctx(), |ui| {
-            ui.add(label("Debug label"));
-        });
-    }
 }
