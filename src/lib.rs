@@ -6,7 +6,7 @@ use egui_glium::EguiGlium;
 use egui::Window as DWindow;
 use glium::DrawParameters;
 use glium::uniforms::{Uniforms, UniformValue};
-use math::color::Colors;
+use math::color::PresetColors;
 
 pub mod tick;
 
@@ -103,7 +103,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             open_debug: false,
-            background_color: Colors::Other(40, 40, 40, 255).into(),
+            background_color: PresetColors::Other(40, 40, 40, 255).into(),
             frame_time: 0,
             quit: false,
             show_sites: false,

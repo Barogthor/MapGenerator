@@ -8,7 +8,7 @@ use MapGenerator::{draw_params, load_glsl, show_window, State, UniformStorage, V
 use MapGenerator::tick::{TICK_DRAW_ID, TICK_FRAME_ID, TICK_RENDER_EGUI_ID, TICK_RENDER_ID, TickSystem};
 use math::map::{new_map, Map};
 use math::voronoi::{VoronoiRegion, VoronoiVertex};
-use math::color::Colors;
+use math::color::PresetColors;
 use math::{Boundary, CameraSystem, Ortho, RawMat4, TransformBuilder, float_eq};
 use math::glm::{Vec2, vec3};
 use math::voronoi::VoronoiVertex::{Inner, Outer};
@@ -51,24 +51,24 @@ fn main() {
     let mut zoom_factor = 0.0;
     let boundary = Boundary::from_top_left(Vec2::new(-30.0,30.0), 60., 60.);
     let mut voronoi_wires = vec![];
-    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 1.0, Colors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 1.0, Colors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 1.0, Colors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 1.0, Colors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 1.0, Colors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 1.0, Colors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 1.0, Colors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 1.0, Colors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 1.0, PresetColors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 1.0, PresetColors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 1.0, PresetColors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 1.0, PresetColors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 1.0, PresetColors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 1.0, PresetColors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 1.0, PresetColors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 1.0, PresetColors::TEAL.into()));
     // let map = basic_voronoi_example(boundary);
     let map = new_map(boundary);
     let mut sites = vec![];
     for region in map.get_regions() {
         let site = region.site;
-        sites.push(VertexColor::new(site.x, site.y, 1.0, Colors::RED.into()));
+        sites.push(VertexColor::new(site.x, site.y, 1.0, PresetColors::RED.into()));
         for vertex in &region.vertices {
             match vertex {
                 Inner(pt) | Outer(_, pt) => {
-                    let v = VertexColor::new(pt.x, pt.y, 1.0, Colors::BLACK.into());
+                    let v = VertexColor::new(pt.x, pt.y, 1.0, PresetColors::BLACK.into());
                     voronoi_wires.push(v);
                 }
             }

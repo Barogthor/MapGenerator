@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{delaunay::{CsTriangulation, VertexType}, Boundary, voronoi::{VoronoiVertex, VoronoiRegion}, color::Colors};
+use crate::{delaunay::{CsTriangulation, VertexType}, Boundary, voronoi::{VoronoiVertex, VoronoiRegion}, color::{PresetColors, HSL}};
 use nalgebra_glm::Vec2;
 use crate::spade::{FloatTriangulation, InsertionError, Triangulation};
 use spade::handles::VoronoiVertex::{Inner, Outer};
@@ -21,7 +21,7 @@ impl Map {
 pub struct MapRegion {
     pub site: Vec2,
     pub vertices: Vec<VoronoiVertex>,
-    pub color: Colors
+    pub color: [f32;3]
 }
 
 pub fn new_map(boundary: Boundary) -> Map
@@ -33,11 +33,11 @@ pub fn new_map(boundary: Boundary) -> Map
     for (i, region) in regions.into_iter().enumerate() {
         let elevation = elevation_map[i];
         let color = if elevation < 0.5 {
-            Colors::BLUE
+            HSL::new(240, 0.3, 0.5)
         } else {
-            Colors::GREEN
+            HSL::new(90, 0.2, 0.5)
         };
-        let mapr = MapRegion{site: region.site, vertices: region.vertices, color  };
+        let mapr = MapRegion{site: region.site, vertices: region.vertices, color: color.to_rgb().into()  };
         map_regions.push(mapr);
     }
     
