@@ -132,7 +132,7 @@ impl TickSystem {
     }
     pub fn debug_tick_iteration(&self) {
         if let Some(history) = self.tick_history.get(&TICK_FRAME_ID) {
-            println!("{:3} FPS with, avg ± {:5.3} ms (-{:5.3}, +{:5.3})",
+            println!("{:4} FPS with, avg ± {:5.3} ms (-{:5.3}, +{:5.3})",
                      history.datas.len(),
                      history.average * 1000.,
                      (history.average - history.min) * 1000.,
