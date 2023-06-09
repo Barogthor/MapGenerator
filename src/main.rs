@@ -50,9 +50,10 @@ fn extract_region_mesh(map: &Map) -> Vec<VertexColor> {
 
 fn main() {
     let mut zoom_factor = 0.0;
+    let mut state = State::default();
     let boundary = Boundary::from_top_left(Vec2::new(-30.0,30.0), 60., 60.);
-    
-    let mut map = new_map(boundary);
+    let seed = 12345;
+    let mut map = new_map(boundary, seed, state.distance_fn, state.reshape_fn);
     let (mut voronoi_sites, mut voronoi_wires) = setup_wires_and_sites_vertexes(&map);
     let mut region_vertexes = extract_region_mesh(&map);
     let mut camera_speed = 0.05f32;
@@ -85,7 +86,6 @@ fn main() {
     let vp = perspective.get() * &camera.view();
     let mut pre_vp: RawMat4 = vp.into();
     // let (mut yaw, mut pitch) = (FRAC_PI_2 * 2., 0.0);
-    let mut state = State::default();
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::NewEvents(cause) => match cause {
@@ -228,7 +228,7 @@ fn main() {
             input.update(&event);
             if state.regenerate {
                 state.regenerate = false;
-                map = map.regenerate();
+                map = map.regenerate(state.distance_fn, state.reshape_fn);
                 let regions_vertexes = extract_region_mesh(&map);
                 let (sites_vertexes, wires_vertexes) = setup_wires_and_sites_vertexes(&map);
                 region_pipeline.update_vertexes(&display, regions_vertexes);

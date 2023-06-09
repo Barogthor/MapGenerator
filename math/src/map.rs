@@ -8,6 +8,7 @@ use bracket_noise::prelude::*;
 
 pub struct Map {
     triangulation: CsTriangulation,
+    seed: u64,
     boundary: Boundary,
     regions: Vec<MapRegion>
 
@@ -21,8 +22,8 @@ impl Map {
         &self.boundary
     }
 
-    pub fn regenerate(&self) -> Self {
-        new_map(self.boundary.clone())
+    pub fn regenerate(&self, distance_fn: DistanceFn, reshape_fn: ReshapingFn) -> Self {
+        new_map(self.boundary.clone(), self.seed, distance_fn, reshape_fn)
     }
 }
 
@@ -32,12 +33,12 @@ pub struct MapRegion {
     pub color: [f32;3]
 }
 
-pub fn new_map(boundary: Boundary) -> Map
+pub fn new_map(boundary: Boundary, seed: u64, distance_fn: DistanceFn, reshape_fn: ReshapingFn) -> Map
 {
     let triangulation = init_rand_points().unwrap();
     let mut regions = extract_voronoi_regions(&triangulation, &boundary);
-    let seed = rand::random::<u64>();
-    let elevation_map = assign_elevation_map(&regions, seed);
+    
+    let elevation_map = assign_elevation_map(&regions, seed, distance_fn);
     let moisture_map = assign_moisture_map(&regions, seed);
     let mut map_regions = vec![];
     for (i, region) in regions.into_iter().enumerate() {
@@ -47,7 +48,7 @@ pub fn new_map(boundary: Boundary) -> Map
         map_regions.push(mapr);
     }
     
-    Map { triangulation, boundary, regions: map_regions }
+    Map { triangulation, boundary, regions: map_regions, seed }
 }
 
 fn generate_random_points() -> Vec<Vec2>{
@@ -123,7 +124,7 @@ fn extract_voronoi_regions(triangulation: &CsTriangulation, boundary: &Boundary)
     regions
 }
 
-fn assign_elevation_map(regions: &Vec<VoronoiRegion>, seed: u64) -> Vec<f32> {
+fn assign_elevation_map(regions: &Vec<VoronoiRegion>, seed: u64, distance_fn: DistanceFn) -> Vec<f32> {
     let wave_length = 0.5;
     let mut noise = FastNoise::seeded(seed);
     let GRID_SIZE = 64.;
@@ -141,7 +142,7 @@ fn assign_elevation_map(regions: &Vec<VoronoiRegion>, seed: u64) -> Vec<f32> {
         let n = noise.get_noise(nx - wave_length, ny - wave_length);
         let elevation = 1. + n;
         // let d = 2. * nx.abs().max(ny.abs());
-        let d = 2. * DistanceFn::Diagonal.apply(nx, ny);
+        let d = 2. * distance_fn.apply(nx, ny);
         elevation_map.push((1. + elevation - d) / 2.);
     }
     elevation_map
@@ -192,6 +193,7 @@ fn get_biome_color(elevation: f32, moisture: f32) -> RGB {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum DistanceFn {
     Euclidean, Euclidean2, Hyperboloid, Squircle, SquareBump, TrigProduct, Diagonal, Manhattan
 }
@@ -210,6 +212,7 @@ impl DistanceFn {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum ReshapingFn {
     Input, Flat, Linear, LinearSteep, Clamped, Smooth, Smooth2, Smooth3, ClampedLess, SmoothLow, Smooth3Low, Archipelago
 }

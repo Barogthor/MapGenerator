@@ -7,6 +7,7 @@ use egui::Window as DWindow;
 use glium::DrawParameters;
 use glium::uniforms::{Uniforms, UniformValue};
 use math::color::PresetColors;
+use math::map::{ReshapingFn, DistanceFn};
 
 pub mod tick;
 pub mod pipeline;
@@ -99,6 +100,8 @@ pub struct State {
     pub quit: bool,
     pub show_sites: bool,
     pub regenerate: bool,
+    pub reshape_fn: ReshapingFn,
+    pub distance_fn: DistanceFn,
 }
 
 impl Default for State {
@@ -110,6 +113,8 @@ impl Default for State {
             quit: false,
             show_sites: false,
             regenerate: false,
+            reshape_fn: ReshapingFn::Linear,
+            distance_fn: DistanceFn::Diagonal,
         }
     }
 }
@@ -126,8 +131,39 @@ fn show_widgets(ui: &mut Ui, state: &mut State) {
     ui.add(label("Background"));
     ui.color_edit_button_rgba_premultiplied(&mut state.background_color);
     ui.end_row();
-
-    ui.checkbox(&mut state.show_sites, "Show sites");
+    ui.add(label("Show sites"));
+    ui.checkbox(&mut state.show_sites, "");
+    ui.end_row();
+    ui.add(label("Distance"));
+    egui::ComboBox::from_id_source("distancefn")
+        .show_ui(ui, |ui| {
+            ui.selectable_value(&mut state.distance_fn, DistanceFn::Euclidean, "Euclidean");
+            ui.selectable_value(&mut state.distance_fn, DistanceFn::Euclidean2, "Euclidean2");
+            ui.selectable_value(&mut state.distance_fn, DistanceFn::Hyperboloid, "Hyperboloid");
+            ui.selectable_value(&mut state.distance_fn, DistanceFn::Squircle, "Squircle");
+            ui.selectable_value(&mut state.distance_fn, DistanceFn::SquareBump, "SquareBump");
+            ui.selectable_value(&mut state.distance_fn, DistanceFn::TrigProduct, "TrigProduct");
+            ui.selectable_value(&mut state.distance_fn, DistanceFn::Diagonal, "Diagonal");
+            ui.selectable_value(&mut state.distance_fn, DistanceFn::Manhattan, "Manhattan");
+        });
+    ui.end_row();
+    // ui.add(label("Reshaping"));
+    // egui::ComboBox::from_id_source("reshapingfn")
+    //     .show_ui(ui, |ui| {
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Input, "Input");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Flat, "Flat");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Clamped, "Clamped");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Linear, "Linear");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::LinearSteep, "LinearSteep");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth, "Smooth");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth2, "Smooth2");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth3, "Smooth3");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::ClampedLess, "ClampedLess");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::SmoothLow, "SmoothLow");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth3Low, "Smooth3Low");
+    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Archipelago, "Archipelago");
+    //     });
+    // ui.end_row();
 }
 
 pub fn show_window(egui: &mut EguiGlium, state: &mut State) {
