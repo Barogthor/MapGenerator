@@ -266,6 +266,7 @@ fn scalar_cross_product(u: Vec2, v: Vec2) -> f32 {
     u.x * v.y - u.y * v.x
 }
 
+#[derive(Clone)]
 pub struct Boundary {
     origin: Vec2,
     width: f32,

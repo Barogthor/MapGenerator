@@ -98,6 +98,7 @@ pub struct State {
     pub frame_time: u128,
     pub quit: bool,
     pub show_sites: bool,
+    pub regenerate: bool,
 }
 
 impl Default for State {
@@ -108,6 +109,7 @@ impl Default for State {
             frame_time: 0,
             quit: false,
             show_sites: false,
+            regenerate: false,
         }
     }
 }
@@ -132,7 +134,7 @@ pub fn show_window(egui: &mut EguiGlium, state: &mut State) {
     TopBottomPanel::top("my_top_bar").show(egui.ctx(), |ui| {
         ui.with_layout(Layout::left_to_right(), |ui| {
             if ui.button("Generate").clicked() {
-                // state.quit = true;
+                state.regenerate = true;
             }
         });
     });
