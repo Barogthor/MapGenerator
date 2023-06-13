@@ -1,27 +1,25 @@
-use MapGenerator::pipeline::{SitePipeline, WirePipeline, RegionPipeline};
 use egui_glium::EguiGlium;
 use glium::glutin::dpi::{PhysicalSize, Size};
-use glium::glutin::GlProfile;
 use glium::glutin::window::WindowBuilder;
-use glium::{Surface, VertexBuffer};
+use glium::glutin::GlProfile;
 use glium::uniforms::AsUniformValue;
-use MapGenerator::{draw_params, load_glsl, show_window, State, UniformStorage, Vertex, VertexColor};
-use MapGenerator::tick::{TICK_DRAW_ID, TICK_FRAME_ID, TICK_RENDER_EGUI_ID, TICK_RENDER_ID, TickSystem};
-use math::map::{new_map, Map};
-use math::voronoi::{VoronoiRegion, VoronoiVertex};
+use glium::Surface;
 use math::color::PresetColors;
-use math::{Boundary, CameraSystem, Ortho, RawMat4, TransformBuilder, float_eq};
-use math::glm::{Vec2, vec3};
-use math::voronoi::VoronoiVertex::{Inner, Outer};
-use ui::{Binding, Gesture, Input, LoopType};
+use math::glm::{vec3, Vec2};
+use math::map::{new_map, Map};
+use math::voronoi::VoronoiVertex::{self, Inner, Outer};
+use math::{float_eq, Boundary, CameraSystem, Ortho, RawMat4, TransformBuilder};
 use ui::winit::event::{Event, StartCause};
 use ui::winit::event_loop::ControlFlow;
+use ui::{Binding, Gesture, Input, LoopType};
+use MapGenerator::pipeline::{RegionPipeline, SitePipeline, WirePipeline};
+use MapGenerator::tick::{
+    TickSystem, TICK_DRAW_ID, TICK_FRAME_ID, TICK_RENDER_EGUI_ID, TICK_RENDER_ID,
+};
+use MapGenerator::{draw_params, show_window, State, UniformStorage, VertexColor};
 
-const PITCH_MAX: f32 = 1.55334f32;
 const WIDTH: f32 = 1920f32;
 const HEIGHT: f32 = 1080f32;
-const FOV_MIN: f32 = 0.0174533f32;
-const FOV_MAX: f32 = 0.785398f32;
 
 fn extract_region_mesh(map: &Map) -> Vec<VertexColor> {
     let mut meshes_vertices = vec![];
@@ -29,20 +27,16 @@ fn extract_region_mesh(map: &Map) -> Vec<VertexColor> {
         let site = region.site;
         let region_vertices = &region.vertices;
         for (i, vertice) in region_vertices.iter().enumerate() {
-            let v2_index = (i+1) % (region_vertices.len()-1);
+            let v2_index = (i + 1) % (region_vertices.len() - 1);
             let v1 = match vertice {
-                VoronoiVertex::Inner(pt) | VoronoiVertex::Outer(_, pt) => {
-                    *pt
-                }
+                VoronoiVertex::Inner(pt) | VoronoiVertex::Outer(_, pt) => *pt,
             };
             let v2 = match region_vertices[v2_index] {
-                VoronoiVertex::Inner(pt) | VoronoiVertex::Outer(_, pt) => {
-                    *pt
-                }
+                VoronoiVertex::Inner(pt) | VoronoiVertex::Outer(_, pt) => *pt,
             };
-            meshes_vertices.push(VertexColor::new(site.x, site.y, 0.0, region.color.into()));
-            meshes_vertices.push(VertexColor::new(v1.x, v1.y, 0.0, region.color.into()));
-            meshes_vertices.push(VertexColor::new(v2.x, v2.y, 0.0, region.color.into()));
+            meshes_vertices.push(VertexColor::new(site.x, site.y, 0.0, region.color));
+            meshes_vertices.push(VertexColor::new(v1.x, v1.y, 0.0, region.color));
+            meshes_vertices.push(VertexColor::new(v2.x, v2.y, 0.0, region.color));
         }
     }
     meshes_vertices
@@ -51,12 +45,12 @@ fn extract_region_mesh(map: &Map) -> Vec<VertexColor> {
 fn main() {
     let mut zoom_factor = 0.0;
     let mut state = State::default();
-    let boundary = Boundary::from_top_left(Vec2::new(-30.0,30.0), 60., 60.);
+    let boundary = Boundary::from_top_left(Vec2::new(-32.0, 32.0), 64., 64.);
     let seed = 12345;
     let mut map = new_map(boundary, seed, state.distance_fn, state.reshape_fn);
-    let (mut voronoi_sites, mut voronoi_wires) = setup_wires_and_sites_vertexes(&map);
-    let mut region_vertexes = extract_region_mesh(&map);
-    let mut camera_speed = 0.05f32;
+    let (voronoi_sites, voronoi_wires) = setup_wires_and_sites_vertexes(&map);
+    let region_vertexes = extract_region_mesh(&map);
+    let mut camera_speed = 50.0f32;
     let draw_params = draw_params();
     let mut tick_system = TickSystem::new();
     tick_system.register_listener(TICK_FRAME_ID);
@@ -65,7 +59,10 @@ fn main() {
     let event_loop: LoopType = LoopType::new();
     let wb = WindowBuilder::new()
         .with_title("Map generation")
-        .with_inner_size(Size::Physical(PhysicalSize::new(WIDTH as u32, HEIGHT as u32)));
+        .with_inner_size(Size::Physical(PhysicalSize::new(
+            WIDTH as u32,
+            HEIGHT as u32,
+        )));
     let cb = glium::glutin::ContextBuilder::new().with_gl_profile(GlProfile::Core);
     let display = glium::Display::new(wb, cb, &event_loop).unwrap();
     let mut egui = EguiGlium::new(&display);
@@ -76,16 +73,16 @@ fn main() {
     let mut site_pipeline = SitePipeline::new(voronoi_sites, &display);
     let mut wire_pipeline = WirePipeline::new(voronoi_wires, &display);
 
-    let map_model = TransformBuilder::new()
-        .scale(0.5,0.5,0.5)
-        .build();
+    let map_model = TransformBuilder::new().scale(0.5, 0.5, 0.5).build();
 
     let mut camera = CameraSystem::default();
-    let (mut w, mut h) = (display.get_framebuffer_dimensions().0, display.get_framebuffer_dimensions().1);
+    // let (mut w, mut h) = (
+    //     display.get_framebuffer_dimensions().0,
+    //     display.get_framebuffer_dimensions().1,
+    // );
     let mut perspective = Ortho::default();
-    let vp = perspective.get() * &camera.view();
+    let vp = perspective.get() * camera.view();
     let mut pre_vp: RawMat4 = vp.into();
-    // let (mut yaw, mut pitch) = (FRAC_PI_2 * 2., 0.0);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::NewEvents(cause) => match cause {
@@ -108,7 +105,6 @@ fn main() {
 
             let (_needs_repaint, shapes) = egui.end_frame(&display);
 
-
             let mut frame = display.draw();
             let bgc = {
                 let c = &state.background_color;
@@ -119,30 +115,36 @@ fn main() {
             let view: RawMat4 = camera.view().into();
             {
                 let model = map_model.get_raw();
-                let mut my_storage =  UniformStorage::default();
+                let mut my_storage = UniformStorage::default();
                 my_storage.add("vp", pre_vp.as_uniform_value());
                 my_storage.add("view", view.as_uniform_value());
                 my_storage.add("model", model.as_uniform_value());
                 my_storage.add("viewPos", view_pos.as_uniform_value());
-                region_pipeline.draw(&mut frame, &my_storage, &draw_params).unwrap();
+                region_pipeline
+                    .draw(&mut frame, &my_storage, &draw_params)
+                    .unwrap();
             }
             if state.show_sites {
                 let model = map_model.get_raw();
-                let mut my_storage =  UniformStorage::default();
+                let mut my_storage = UniformStorage::default();
                 my_storage.add("vp", pre_vp.as_uniform_value());
                 my_storage.add("view", view.as_uniform_value());
                 my_storage.add("model", model.as_uniform_value());
                 my_storage.add("viewPos", view_pos.as_uniform_value());
-                site_pipeline.draw(&mut frame, &my_storage, &draw_params).unwrap();
+                site_pipeline
+                    .draw(&mut frame, &my_storage, &draw_params)
+                    .unwrap();
             }
             {
                 let model = map_model.get_raw();
-                let mut my_storage =  UniformStorage::default();
+                let mut my_storage = UniformStorage::default();
                 my_storage.add("vp", pre_vp.as_uniform_value());
                 my_storage.add("view", view.as_uniform_value());
                 my_storage.add("model", model.as_uniform_value());
                 my_storage.add("viewPos", view_pos.as_uniform_value());
-                wire_pipeline.draw(&mut frame, &my_storage, &draw_params).unwrap();
+                wire_pipeline
+                    .draw(&mut frame, &my_storage, &draw_params)
+                    .unwrap();
             }
 
             tick_system.start_tick(TICK_RENDER_EGUI_ID);
@@ -155,7 +157,10 @@ fn main() {
             // tick_system.debug_tick(TICK_RENDER_ID);
         }
         Event::RedrawEventsCleared => {
-            if input.poll_gesture(&binding.exit) || input.poll_gesture(&Gesture::QuitTrigger) || state.quit {
+            if input.poll_gesture(&binding.exit)
+                || input.poll_gesture(&Gesture::QuitTrigger)
+                || state.quit
+            {
                 *control_flow = ControlFlow::Exit;
             }
             // if input.poll_gesture(&binding.toggle_mouse) {
@@ -185,15 +190,19 @@ fn main() {
             // }
             let step = input.poll_analog2d(&binding.scroll);
             if !float_eq(step.y, 0.0, 1e-3) {
-                let future_zoom = zoom_factor - step.y*10.;
+                let future_zoom = zoom_factor - step.y * 10.;
                 if future_zoom > -5. && future_zoom < 10. {
-                    zoom_factor=future_zoom;
-                    perspective.zoom(-step.y*10.);
+                    zoom_factor = future_zoom;
+                    perspective.zoom(-step.y * 10.);
                 }
             }
 
-            if input.poll_gesture(&binding.speedup) { camera_speed += 0.05; }
-            if input.poll_gesture(&binding.speeddown) && camera_speed > 0.1 { camera_speed -= 0.05; }
+            if input.poll_gesture(&binding.speedup) {
+                camera_speed += 5.;
+            }
+            if input.poll_gesture(&binding.speeddown) && camera_speed > 10. {
+                camera_speed -= 5.;
+            }
 
             pre_vp = (perspective.get() * camera.view()).into();
 
@@ -201,7 +210,7 @@ fn main() {
                 let step = input.poll_analog2d(&binding.movement);
 
                 if step.y != 0. || step.x != 0. {
-                    camera.pos += vec3(step.x, step.y, 0.0) * camera_speed;
+                    camera.pos += vec3(step.x, step.y, 0.0) * camera_speed * duration as f32;
                     // println!("{}", camera.pos);
                 }
             }
@@ -214,28 +223,28 @@ fn main() {
                 tick_system.reset();
             }
             tick_system.start_tick(TICK_FRAME_ID);
-        },
+        }
         _ => {
             match &event {
                 Event::WindowEvent { event, .. } => {
-                    if egui.is_quit_event(&event) {
+                    if egui.is_quit_event(event) {
                         *control_flow = glium::glutin::event_loop::ControlFlow::Exit;
                     }
                     egui.on_event(event)
-                },
+                }
                 _ => {}
             }
             input.update(&event);
             if state.regenerate {
                 state.regenerate = false;
-                map = map.regenerate(state.distance_fn, state.reshape_fn);
+                map = map.regenerate(state.seed, state.distance_fn, state.reshape_fn);
                 let regions_vertexes = extract_region_mesh(&map);
                 let (sites_vertexes, wires_vertexes) = setup_wires_and_sites_vertexes(&map);
                 region_pipeline.update_vertexes(&display, regions_vertexes);
                 site_pipeline.update_vertexes(&display, sites_vertexes);
                 wire_pipeline.update_vertexes(&display, wires_vertexes);
             }
-        },
+        }
     });
 }
 
@@ -243,17 +252,62 @@ fn setup_wires_and_sites_vertexes(map: &Map) -> (Vec<VertexColor>, Vec<VertexCol
     let mut voronoi_wires = vec![];
     let mut voronoi_sites = vec![];
     let boundary = map.get_boundary();
-    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 1.0, PresetColors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 1.0, PresetColors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.top_right().x, boundary.top_right().y, 1.0, PresetColors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 1.0, PresetColors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_right().x, boundary.bottom_right().y, 1.0, PresetColors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 1.0, PresetColors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.bottom_left().x, boundary.bottom_left().y, 1.0, PresetColors::TEAL.into()));
-    voronoi_wires.push(VertexColor::new(boundary.top_left().x, boundary.top_left().y, 1.0, PresetColors::TEAL.into()));
+    voronoi_wires.push(VertexColor::new(
+        boundary.top_left().x,
+        boundary.top_left().y,
+        1.0,
+        PresetColors::TEAL.into(),
+    ));
+    voronoi_wires.push(VertexColor::new(
+        boundary.top_right().x,
+        boundary.top_right().y,
+        1.0,
+        PresetColors::TEAL.into(),
+    ));
+    voronoi_wires.push(VertexColor::new(
+        boundary.top_right().x,
+        boundary.top_right().y,
+        1.0,
+        PresetColors::TEAL.into(),
+    ));
+    voronoi_wires.push(VertexColor::new(
+        boundary.bottom_right().x,
+        boundary.bottom_right().y,
+        1.0,
+        PresetColors::TEAL.into(),
+    ));
+    voronoi_wires.push(VertexColor::new(
+        boundary.bottom_right().x,
+        boundary.bottom_right().y,
+        1.0,
+        PresetColors::TEAL.into(),
+    ));
+    voronoi_wires.push(VertexColor::new(
+        boundary.bottom_left().x,
+        boundary.bottom_left().y,
+        1.0,
+        PresetColors::TEAL.into(),
+    ));
+    voronoi_wires.push(VertexColor::new(
+        boundary.bottom_left().x,
+        boundary.bottom_left().y,
+        1.0,
+        PresetColors::TEAL.into(),
+    ));
+    voronoi_wires.push(VertexColor::new(
+        boundary.top_left().x,
+        boundary.top_left().y,
+        1.0,
+        PresetColors::TEAL.into(),
+    ));
     for region in map.get_regions() {
         let site = region.site;
-        voronoi_sites.push(VertexColor::new(site.x, site.y, 1.0, PresetColors::RED.into()));
+        voronoi_sites.push(VertexColor::new(
+            site.x,
+            site.y,
+            1.0,
+            PresetColors::RED.into(),
+        ));
         for vertex in &region.vertices {
             match vertex {
                 Inner(pt) | Outer(_, pt) => {
@@ -265,4 +319,3 @@ fn setup_wires_and_sites_vertexes(map: &Map) -> (Vec<VertexColor>, Vec<VertexCol
     }
     (voronoi_sites, voronoi_wires)
 }
-

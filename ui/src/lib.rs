@@ -1,9 +1,9 @@
 pub use winit;
 pub type LoopType = winit::event_loop::EventLoop<()>;
 
-use winit::event::{VirtualKeyCode, MouseButton, Event};
-use math::glm;
 use crate::InputState::{Pressed, Released};
+use math::glm;
+use winit::event::{Event, MouseButton, VirtualKeyCode};
 
 const MAX_MOUSE_BUTTONS: usize = 256;
 const MAX_KEY_BUTTONS: usize = 512;
@@ -117,7 +117,7 @@ impl Input {
                     0.0
                 },
             ),
-            Analog2d::MouseWheel { sensitivity } => { (&self.mouse_wheel_dir) * sensitivity }
+            Analog2d::MouseWheel { sensitivity } => (&self.mouse_wheel_dir) * sensitivity,
             Analog2d::NoAnalog2d => glm::vec2(0., 0.),
         }
     }
@@ -133,37 +133,24 @@ impl Input {
     pub fn update(&mut self, event: &Event<()>) {
         match event {
             Event::WindowEvent { event, .. } => match event {
-                winit::event::WindowEvent::KeyboardInput {
-                    device_id,
-                    input,
-                    is_synthetic,
-                } => match (input.virtual_keycode, input.state) {
-                    (Some(key), winit::event::ElementState::Pressed) => {
-                        self.key_buttons[key as usize] = Pressed(self.current_index)
+                winit::event::WindowEvent::KeyboardInput { input, .. } => {
+                    match (input.virtual_keycode, input.state) {
+                        (Some(key), winit::event::ElementState::Pressed) => {
+                            self.key_buttons[key as usize] = Pressed(self.current_index)
+                        }
+                        (Some(key), winit::event::ElementState::Released) => {
+                            self.key_buttons[key as usize] = Released(self.current_index)
+                        }
+                        (None, _) => {}
                     }
-                    (Some(key), winit::event::ElementState::Released) => {
-                        self.key_buttons[key as usize] = Released(self.current_index)
-                    }
-                    (None, _) => {}
-                },
-                winit::event::WindowEvent::Focused(flag) => {}
-                winit::event::WindowEvent::MouseWheel {
-                    device_id,
-                    delta,
-                    phase,
-                    ..
-                } => match delta {
+                }
+                winit::event::WindowEvent::MouseWheel { delta, .. } => match delta {
                     winit::event::MouseScrollDelta::LineDelta(x, y) => {
                         self.mouse_wheel_dir += glm::vec2(*x, *y);
                     }
                     _ => {}
                 },
-                winit::event::WindowEvent::MouseInput {
-                    device_id,
-                    state,
-                    button,
-                    ..
-                } => match state {
+                winit::event::WindowEvent::MouseInput { state, button, .. } => match state {
                     winit::event::ElementState::Pressed => {
                         self.mouse_buttons[mouse_button_index(button) as usize] =
                             Pressed(self.current_index)
@@ -173,11 +160,6 @@ impl Input {
                             Released(self.current_index)
                     }
                 },
-                winit::event::WindowEvent::CursorMoved {
-                    device_id,
-                    position,
-                    ..
-                } => {}
                 winit::event::WindowEvent::CloseRequested => {
                     self.quit_requested_index = self.current_index
                 }
@@ -231,7 +213,6 @@ fn mouse_button_index(button: &MouseButton) -> usize {
     }
 }
 
-
 type Key = VirtualKeyCode;
 pub struct Binding {
     pub exit: Gesture,
@@ -244,7 +225,7 @@ pub struct Binding {
     pub toggle_mouse: Gesture,
     pub toggle_torch_light: Gesture,
     pub speedup: Gesture,
-    pub speeddown: Gesture
+    pub speeddown: Gesture,
 }
 
 impl Binding {
@@ -278,7 +259,7 @@ impl Binding {
             toggle_mouse: Gesture::ButtonHold(MouseButton::Right),
             toggle_torch_light: Gesture::KeyTrigger(Key::T),
             speedup: Gesture::KeyTrigger(Key::NumpadAdd),
-            speeddown: Gesture::KeyTrigger(Key::NumpadSubtract)
+            speeddown: Gesture::KeyTrigger(Key::NumpadSubtract),
         }
     }
 }

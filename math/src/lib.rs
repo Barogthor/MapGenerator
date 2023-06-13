@@ -2,10 +2,10 @@ pub use nalgebra_glm as glm;
 use nalgebra_glm::Vec2;
 pub use rand;
 pub use spade;
-pub mod delaunay;
-pub mod voronoi;
-pub mod map;
 pub mod color;
+pub mod delaunay;
+pub mod map;
+pub mod voronoi;
 
 pub type RawMat4 = [[f32; 4]; 4];
 #[inline]
@@ -17,12 +17,11 @@ pub fn to_radians(degree: f32) -> f32 {
     degree.to_radians()
 }
 
-
-pub struct Perspective{
+pub struct Perspective {
     pub aspect: f32,
     pub fov: f32,
     pub near: f32,
-    pub far: f32
+    pub far: f32,
 }
 
 impl Perspective {
@@ -37,29 +36,36 @@ impl Default for Perspective {
             aspect: 1024. / 768.,
             fov: std::f64::consts::FRAC_PI_4 as f32,
             near: 0.1,
-            far: 100.0
+            far: 100.0,
         }
     }
 }
 
-pub struct Ortho{
+pub struct Ortho {
     pub left: f32,
     pub right: f32,
     pub bottom: f32,
     pub top: f32,
     pub near: f32,
-    pub far: f32
+    pub far: f32,
 }
 
 impl Ortho {
     pub fn get(&self) -> glm::Mat4 {
-        glm::ortho(self.left, self.right, self.bottom, self.top, self.near, self.far)
+        glm::ortho(
+            self.left,
+            self.right,
+            self.bottom,
+            self.top,
+            self.near,
+            self.far,
+        )
     }
-    pub fn zoom(&mut self, k : f32) {
-        self.left-=k;
-        self.right+=k;
-        self.top+=k;
-        self.bottom-=k;
+    pub fn zoom(&mut self, k: f32) {
+        self.left -= k;
+        self.right += k;
+        self.top += k;
+        self.bottom -= k;
     }
 }
 
@@ -80,7 +86,7 @@ impl Default for Ortho {
 pub struct CameraSystem {
     pub pos: glm::Vec3,
     pub front: glm::Vec3,
-    pub up: glm::Vec3
+    pub up: glm::Vec3,
 }
 
 impl CameraSystem {
@@ -98,12 +104,11 @@ impl Default for CameraSystem {
         }
     }
 }
-impl From<&CameraSystem> for glm::Mat4{
+impl From<&CameraSystem> for glm::Mat4 {
     fn from(cam: &CameraSystem) -> Self {
         cam.view()
     }
 }
-
 
 pub struct Transform {
     transform: glm::Mat4,
@@ -116,7 +121,7 @@ impl Transform {
         }
     }
 
-    pub fn scale(&mut self, x: f32, y: f32, z: f32){
+    pub fn scale(&mut self, x: f32, y: f32, z: f32) {
         self.transform = glm::scale(&self.transform, &glm::vec3(x, y, z));
     }
 
@@ -126,7 +131,7 @@ impl Transform {
         self.transform.m34 = z;
     }
 
-    pub fn translate(&mut self, x: f32, y: f32, z: f32){
+    pub fn translate(&mut self, x: f32, y: f32, z: f32) {
         self.transform = glm::translate(&self.transform, &glm::vec3(x, y, z));
     }
 
@@ -141,9 +146,7 @@ impl Transform {
         self.transform.clone().into()
     }
     pub fn from(mat: glm::Mat4) -> Self {
-        Self {
-            transform: mat
-        }
+        Self { transform: mat }
     }
 }
 
@@ -156,7 +159,7 @@ impl From<&Transform> for RawMat4 {
 pub struct TransformBuilder(Transform);
 
 impl TransformBuilder {
-    pub fn new()-> Self {
+    pub fn new() -> Self {
         Self(Transform::new())
     }
 
@@ -169,7 +172,7 @@ impl TransformBuilder {
         self
     }
     pub fn translate(mut self, x: f32, y: f32, z: f32) -> Self {
-        self.0.translate(x, y , z);
+        self.0.translate(x, y, z);
         self
     }
     pub fn build(self) -> Transform {
@@ -190,9 +193,7 @@ pub struct Segment {
 
 impl Segment {
     pub fn new(startp: Vec2, endp: Vec2) -> Self {
-        Self {
-            a: startp, b: endp
-        }
+        Self { a: startp, b: endp }
     }
 
     pub fn intercept_by_ray(&self, line_dir: Vec2, line_point: Vec2) -> Option<Vec2> {
@@ -209,8 +210,8 @@ impl Segment {
         if s < 0. {
             return None;
         }
-        let i = line_point+line_dir*s;
-        let t = if float_eq(self.a.x, self.b.x,1e-6) {
+        let i = line_point + line_dir * s;
+        let t = if float_eq(self.a.x, self.b.x, 1e-6) {
             (i.y - self.a.y) / (self.b.y - self.a.y)
         } else {
             (i.x - self.a.x) / (self.b.x - self.a.x)
@@ -254,14 +255,15 @@ impl Segment {
 
 #[inline]
 fn vector_same_direction(u: Vec2, v: Vec2) -> bool {
-    float_eq(u.normalize().dot(&v.normalize()),1., 1e-6)
+    float_eq(u.normalize().dot(&v.normalize()), 1., 1e-6)
 }
 
 #[inline]
 fn vector_parallel(u: Vec2, v: Vec2) -> bool {
-    float_eq(scalar_cross_product(u,v), 0., 1e-6)
+    float_eq(scalar_cross_product(u, v), 0., 1e-6)
 }
 
+#[inline]
 fn scalar_cross_product(u: Vec2, v: Vec2) -> f32 {
     u.x * v.y - u.y * v.x
 }
@@ -270,14 +272,15 @@ fn scalar_cross_product(u: Vec2, v: Vec2) -> f32 {
 pub struct Boundary {
     origin: Vec2,
     width: f32,
-    height: f32
+    height: f32,
 }
 
 impl Boundary {
     pub fn from_top_left(top_left_origin: Vec2, width: f32, height: f32) -> Self {
         Self {
             origin: top_left_origin,
-            width, height
+            width,
+            height,
         }
     }
     pub fn top_left(&self) -> Vec2 {
@@ -291,6 +294,11 @@ impl Boundary {
     }
     pub fn bottom_right(&self) -> Vec2 {
         Vec2::new(self.origin.x + self.width, self.origin.y - self.height)
+    }
+
+    pub fn point_inside(&self, pt: Vec2) -> bool {
+        let bl = self.bottom_left();
+        bl.x <= pt.x && bl.x + self.width >= pt.x && bl.y <= pt.y && bl.y + self.height >= pt.y
     }
 }
 
@@ -375,7 +383,6 @@ mod segment_tests {
         let ab = Segment::new(a, b);
         let cd = d - c;
         assert!(ab.intercept_by_ray(cd, c).is_none());
-
     }
 
     #[test]
@@ -427,7 +434,7 @@ mod segment_tests {
         let a = Vec2::new(-6.5, 2.);
         let b = Vec2::new(-5.5, 3.);
         let p = Vec2::new(-6., 2.5);
-        let ab = Segment::new(a,b);
+        let ab = Segment::new(a, b);
         assert!(ab.is_point_on(p));
     }
 
@@ -436,7 +443,7 @@ mod segment_tests {
         let a = Vec2::new(-5., 2.);
         let b = Vec2::new(-5., 3.);
         let p = Vec2::new(-5., 2.5);
-        let ab = Segment::new(a,b);
+        let ab = Segment::new(a, b);
         assert!(ab.is_point_on(p));
     }
     #[test]
@@ -444,7 +451,7 @@ mod segment_tests {
         let a = Vec2::new(-6.5, 1.5);
         let b = Vec2::new(-5.5, 1.5);
         let p = Vec2::new(-6., 1.5);
-        let ab = Segment::new(a,b);
+        let ab = Segment::new(a, b);
         assert!(ab.is_point_on(p));
     }
 
@@ -453,7 +460,7 @@ mod segment_tests {
         let a = Vec2::new(-6.5, 2.);
         let b = Vec2::new(-5.5, 3.);
         let p = Vec2::new(-5.6, 2.2);
-        let ab = Segment::new(a,b);
+        let ab = Segment::new(a, b);
         assert!(!ab.is_point_on(p));
     }
 
@@ -462,7 +469,7 @@ mod segment_tests {
         let a = Vec2::new(-5., 2.);
         let b = Vec2::new(-5., 3.);
         let p = Vec2::new(-5.6, 2.2);
-        let ab = Segment::new(a,b);
+        let ab = Segment::new(a, b);
         assert!(!ab.is_point_on(p));
     }
     #[test]
@@ -470,7 +477,7 @@ mod segment_tests {
         let a = Vec2::new(-6.5, 1.5);
         let b = Vec2::new(-5.5, 1.5);
         let p = Vec2::new(-5.6, 2.2);
-        let ab = Segment::new(a,b);
+        let ab = Segment::new(a, b);
         assert!(!ab.is_point_on(p));
     }
     #[test]
@@ -478,7 +485,7 @@ mod segment_tests {
         let a = Vec2::new(-7., 1.);
         let b = Vec2::new(-6., 1.);
         let p = Vec2::new(-7.5, 1.);
-        let ab = Segment::new(a,b);
+        let ab = Segment::new(a, b);
         assert!(!ab.is_point_on(p));
     }
 }
@@ -489,14 +496,14 @@ mod boundary_tests {
 
     #[test]
     fn test_intercept_voronoi_4p() {
-        let boundary = Boundary::from_top_left(Vec2::new(-10.0,10.0), 20., 20.);
+        let boundary = Boundary::from_top_left(Vec2::new(-10.0, 10.0), 20., 20.);
         let top = Segment::new(boundary.top_right(), boundary.top_left());
         let right = Segment::new(boundary.bottom_right(), boundary.top_right());
         let bot = Segment::new(boundary.bottom_left(), boundary.bottom_right());
         let left = Segment::new(boundary.top_left(), boundary.bottom_left());
-        let in_vertex1 = Vec2::new(0.0,2.0);
-        let in_vertex2 = Vec2::new(2.,6.0);
-        let bound_top_intersect = Vec2::new(2.,10.);
+        let in_vertex1 = Vec2::new(0.0, 2.0);
+        let in_vertex2 = Vec2::new(2., 6.0);
+        let bound_top_intersect = Vec2::new(2., 10.);
         let bound_left_intersect = Vec2::new(-10., -1.3333333);
         let bound_bot_intersect = Vec2::new(4., -10.);
         let bound_right_intersect = Vec2::new(10., -2.);

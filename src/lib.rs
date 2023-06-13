@@ -1,19 +1,18 @@
+use egui::{Grid, Layout, SidePanel, TopBottomPanel, Ui, Widget};
+use egui_glium::EguiGlium;
+use glium::uniforms::{UniformValue, Uniforms};
+use glium::DrawParameters;
+use math::color::PresetColors;
+use math::map::{DistanceFn, ReshapingFn};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
-use egui::{Grid, Layout, SidePanel, TopBottomPanel, Ui, Widget};
-use egui_glium::EguiGlium;
-use egui::Window as DWindow;
-use glium::DrawParameters;
-use glium::uniforms::{Uniforms, UniformValue};
-use math::color::PresetColors;
-use math::map::{ReshapingFn, DistanceFn};
 
-pub mod tick;
 pub mod pipeline;
+pub mod tick;
 
 pub fn draw_params() -> DrawParameters<'static> {
-    use glium::{Depth, DepthTest, BackfaceCullingMode};
+    use glium::{BackfaceCullingMode, Depth, DepthTest};
     DrawParameters {
         depth: Depth {
             test: DepthTest::IfLess,
@@ -54,7 +53,6 @@ impl Vertex {
 
 glium::implement_vertex!(Vertex, position, normal, tex_coords);
 
-
 #[derive(Copy, Clone, Debug)]
 pub struct VertexColor {
     position: [f32; 3],
@@ -72,9 +70,8 @@ impl VertexColor {
 
 glium::implement_vertex!(VertexColor, position, color);
 
-
 #[derive(Default, Clone)]
-pub struct UniformStorage<'a> (HashMap<String, UniformValue<'a>>);
+pub struct UniformStorage<'a>(HashMap<String, UniformValue<'a>>);
 
 impl<'a> UniformStorage<'a> {
     pub fn add(&mut self, name: &str, value: UniformValue<'a>) {
@@ -90,9 +87,6 @@ impl Uniforms for UniformStorage<'_> {
     }
 }
 
-
-
-
 pub struct State {
     pub open_debug: bool,
     pub background_color: [f32; 4],
@@ -102,6 +96,7 @@ pub struct State {
     pub regenerate: bool,
     pub reshape_fn: ReshapingFn,
     pub distance_fn: DistanceFn,
+    pub seed: u64,
 }
 
 impl Default for State {
@@ -113,18 +108,16 @@ impl Default for State {
             quit: false,
             show_sites: false,
             regenerate: false,
-            reshape_fn: ReshapingFn::Linear,
+            reshape_fn: ReshapingFn::Flat,
             distance_fn: DistanceFn::Diagonal,
+            seed: 12345,
         }
     }
 }
 
-
 fn label<'a>(title: &'a str) -> impl Widget + 'a {
     let label = format!("{}:", title);
-    move |ui: &mut Ui| {
-        ui.label(label)
-    }
+    move |ui: &mut Ui| ui.label(label)
 }
 
 fn show_widgets(ui: &mut Ui, state: &mut State) {
@@ -135,35 +128,53 @@ fn show_widgets(ui: &mut Ui, state: &mut State) {
     ui.checkbox(&mut state.show_sites, "");
     ui.end_row();
     ui.add(label("Distance"));
-    egui::ComboBox::from_id_source("distancefn")
-        .show_ui(ui, |ui| {
-            ui.selectable_value(&mut state.distance_fn, DistanceFn::Euclidean, "Euclidean");
-            ui.selectable_value(&mut state.distance_fn, DistanceFn::Euclidean2, "Euclidean2");
-            ui.selectable_value(&mut state.distance_fn, DistanceFn::Hyperboloid, "Hyperboloid");
-            ui.selectable_value(&mut state.distance_fn, DistanceFn::Squircle, "Squircle");
-            ui.selectable_value(&mut state.distance_fn, DistanceFn::SquareBump, "SquareBump");
-            ui.selectable_value(&mut state.distance_fn, DistanceFn::TrigProduct, "TrigProduct");
-            ui.selectable_value(&mut state.distance_fn, DistanceFn::Diagonal, "Diagonal");
-            ui.selectable_value(&mut state.distance_fn, DistanceFn::Manhattan, "Manhattan");
-        });
+    egui::ComboBox::from_id_source("distancefn").show_ui(ui, |ui| {
+        ui.selectable_value(&mut state.distance_fn, DistanceFn::Euclidean, "Euclidean");
+        ui.selectable_value(&mut state.distance_fn, DistanceFn::Euclidean2, "Euclidean2");
+        ui.selectable_value(
+            &mut state.distance_fn,
+            DistanceFn::Hyperboloid,
+            "Hyperboloid",
+        );
+        ui.selectable_value(&mut state.distance_fn, DistanceFn::Squircle, "Squircle");
+        ui.selectable_value(&mut state.distance_fn, DistanceFn::SquareBump, "SquareBump");
+        ui.selectable_value(
+            &mut state.distance_fn,
+            DistanceFn::TrigProduct,
+            "TrigProduct",
+        );
+        ui.selectable_value(&mut state.distance_fn, DistanceFn::Diagonal, "Diagonal");
+        ui.selectable_value(&mut state.distance_fn, DistanceFn::Manhattan, "Manhattan");
+    });
     ui.end_row();
-    // ui.add(label("Reshaping"));
-    // egui::ComboBox::from_id_source("reshapingfn")
-    //     .show_ui(ui, |ui| {
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Input, "Input");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Flat, "Flat");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Clamped, "Clamped");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Linear, "Linear");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::LinearSteep, "LinearSteep");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth, "Smooth");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth2, "Smooth2");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth3, "Smooth3");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::ClampedLess, "ClampedLess");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::SmoothLow, "SmoothLow");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth3Low, "Smooth3Low");
-    //         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Archipelago, "Archipelago");
-    //     });
-    // ui.end_row();
+    ui.add(label("Reshaping"));
+    egui::ComboBox::from_id_source("reshapingfn").show_ui(ui, |ui| {
+        ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Input, "Input");
+        ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Flat, "Flat");
+        ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Clamped, "Clamped");
+        ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Linear, "Linear");
+        ui.selectable_value(
+            &mut state.reshape_fn,
+            ReshapingFn::LinearSteep,
+            "LinearSteep",
+        );
+        ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth, "Smooth");
+        ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth2, "Smooth2");
+        ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth3, "Smooth3");
+        ui.selectable_value(
+            &mut state.reshape_fn,
+            ReshapingFn::ClampedLess,
+            "ClampedLess",
+        );
+        ui.selectable_value(&mut state.reshape_fn, ReshapingFn::SmoothLow, "SmoothLow");
+        ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Smooth3Low, "Smooth3Low");
+        ui.selectable_value(
+            &mut state.reshape_fn,
+            ReshapingFn::Archipelago,
+            "Archipelago",
+        );
+    });
+    ui.end_row();
 }
 
 pub fn show_window(egui: &mut EguiGlium, state: &mut State) {
@@ -172,17 +183,19 @@ pub fn show_window(egui: &mut EguiGlium, state: &mut State) {
             if ui.button("Generate").clicked() {
                 state.regenerate = true;
             }
+            ui.add(label("Seed"));
+            ui.add(egui::Slider::new(&mut state.seed, 1..=2u64.pow(16)).logarithmic(true));
         });
     });
-    SidePanel::left("my_side_panel").min_width(150.).show(egui.ctx(), |ui| {
-
-
-        Grid::new("my_grid")
-            .num_columns(2)
-            .spacing([40.0, 4.0])
-            .striped(true)
-            .show(ui, |ui| {
-                show_widgets(ui, state);
-            });
-    });
+    SidePanel::left("my_side_panel")
+        .min_width(150.)
+        .show(egui.ctx(), |ui| {
+            Grid::new("my_grid")
+                .num_columns(2)
+                .spacing([40.0, 4.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    show_widgets(ui, state);
+                });
+        });
 }
