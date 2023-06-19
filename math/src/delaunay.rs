@@ -1,5 +1,7 @@
-use nalgebra_glm::{Vec2};
-use spade::{DelaunayTriangulation, HasPosition, Point2};
+use std::ops::Deref;
+
+use nalgebra_glm::Vec2;
+use spade::{ConstrainedDelaunayTriangulation, DelaunayTriangulation, HasPosition, Point2};
 
 pub struct VertexType {
     pub position: Vec2,
@@ -12,6 +14,16 @@ impl VertexType {
 
         Self {
             position: Vec2::new(x, y),
+            radius: DEFAULT_CIRCLE_RADIUS,
+        }
+    }
+}
+
+impl From<Vec2> for VertexType {
+    fn from(value: Vec2) -> Self {
+        const DEFAULT_CIRCLE_RADIUS: f32 = 2.0;
+        Self {
+            position: value,
             radius: DEFAULT_CIRCLE_RADIUS,
         }
     }
@@ -59,29 +71,21 @@ impl Default for FaceType {
     }
 }
 
-pub type CsTriangulation =
-DelaunayTriangulation<VertexType, DirectedEdgeType, UndirectedEdgeType, FaceType>;
+pub type NormalTriangulation =
+    DelaunayTriangulation<VertexType, DirectedEdgeType, UndirectedEdgeType, FaceType>;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum EdgeMode {
-    Disabled,
-    Undirected,
-    Directed { reversed: bool },
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub struct SpadeIndex(usize);
+impl SpadeIndex {
+    pub fn new(index: usize) -> Self {
+        Self(index)
+    }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ConversionOptions {
-    pub directed_edge_mode: EdgeMode,
-    // pub vertex_stroke_color: SketchColor,
-    // pub vertex_color: SketchColor,
-}
+impl Deref for SpadeIndex {
+    type Target = usize;
 
-impl Default for ConversionOptions {
-    fn default() -> Self {
-        Self {
-            directed_edge_mode: EdgeMode::Undirected,
-            // vertex_stroke_color: SketchColor::BLACK,
-            // vertex_color: SketchColor::DIM_GRAY,
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

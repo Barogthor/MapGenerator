@@ -1,16 +1,19 @@
+use std::collections::{BTreeSet, HashMap};
 use std::f32::consts::FRAC_PI_2;
 
-use crate::color::PresetColors;
-use crate::spade::{FloatTriangulation, InsertionError, Triangulation};
+use crate::spade::{InsertionError, Triangulation};
+use crate::voronoi::VoronoiCorner;
 use crate::{
     color::RGB,
-    delaunay::{CsTriangulation, VertexType},
+    delaunay::{NormalTriangulation, VertexType},
     voronoi::{VoronoiRegion, VoronoiVertex},
     Boundary,
 };
 use bracket_noise::prelude::*;
 use nalgebra_glm::Vec2;
 use spade::handles::VoronoiVertex::{Inner, Outer};
+
+type CsTriangulation = NormalTriangulation;
 
 pub struct Map {
     triangulation: CsTriangulation,
@@ -43,7 +46,9 @@ pub fn new_map(
     distance_fn: DistanceFn,
     reshape_fn: ReshapingFn,
 ) -> Map {
-    let triangulation = init_rand_points().unwrap();
+    let points = generate_random_points();
+    let triangulation = init_triangulation_points(points).unwrap();
+    let triangulation = init_triangulation_points(relax_sites(triangulation)).unwrap();
     let mut regions = extract_voronoi_regions(&triangulation, &boundary);
 
     let elevation_map = assign_elevation_map(&regions, seed, distance_fn, reshape_fn);
@@ -67,7 +72,7 @@ pub fn new_map(
 }
 
 fn generate_random_points() -> Vec<Vec2> {
-    let GRID_SIZE = 68;
+    let GRID_SIZE = 66;
     let HALF_GRID = GRID_SIZE / 2;
     let JITTER = 0.5f32;
 
@@ -85,13 +90,65 @@ fn generate_random_points() -> Vec<Vec2> {
     points
 }
 
-fn init_rand_points() -> Result<CsTriangulation, InsertionError> {
+fn init_triangulation_points(points: Vec<Vec2>) -> Result<CsTriangulation, InsertionError> {
     let mut result = CsTriangulation::new();
-    let points = generate_random_points();
     for pt in points {
         result.insert(VertexType::new(pt.x, pt.y))?;
     }
     Ok(result)
+}
+
+fn relax_sites(triangulation: CsTriangulation) -> Vec<Vec2> {
+    let mut relaxed_sites = vec![];
+    for site in triangulation.vertices() {
+        let region = site.as_voronoi_face();
+        let mut region_vertices = vec![];
+        let mut skip_relax = false;
+        for edge in region.adjacent_edges() {
+            match [edge.from(), edge.to()] {
+                [Inner(from), Inner(to)] => {
+                    let from = from.circumcenter();
+                    let from = Vec2::new(from.x, from.y);
+                    let to = to.circumcenter();
+                    let to = Vec2::new(to.x, to.y);
+                    let dir = from - to;
+                    if dir.norm_squared() > 4.0 {
+                        skip_relax = true;
+                    }
+
+                    region_vertices.push(to);
+                    region_vertices.push(from);
+                }
+                [Inner(from), Outer(edge)] | [Outer(edge), Inner(from)] => {
+                    let from = from.circumcenter();
+                    let from = Vec2::new(from.x, from.y);
+                    let dir = edge.direction_vector();
+                    let dir = Vec2::new(dir.x, dir.y);
+                    if dir.norm_squared() > 4.0 {
+                        skip_relax = true;
+                    }
+
+                    let outerv = from + dir;
+                    region_vertices.push(outerv);
+                    region_vertices.push(from);
+                }
+                [_, _] => {}
+            };
+        }
+        if !skip_relax {
+            let mut sum_x = 0.;
+            let mut sum_y = 0.;
+            let vertice_count = region_vertices.len() as f32;
+            for i in 0..region_vertices.len() {
+                sum_x += region_vertices[i].x;
+                sum_y += region_vertices[i].y;
+            }
+            relaxed_sites.push(Vec2::new(sum_x / vertice_count, sum_y / vertice_count));
+        } else {
+            relaxed_sites.push(Vec2::new(site.position().x, site.position().y));
+        }
+    }
+    relaxed_sites
 }
 
 fn extract_voronoi_regions(
@@ -106,17 +163,40 @@ fn extract_voronoi_regions(
         (upper, lower)
     };
     let mut regions = vec![];
-    for vertex in triangulation.get_vertices_in_rectangle(lower, upper) {
+    let mut corners = BTreeSet::new();
+    // let mut regions_neighbors = HashMap::new();
+
+    // for vertex in triangulation.get_vertices_in_rectangle(lower, upper) {
+    for vertex in triangulation.vertices() {
         let region_site = vertex.data().position;
+
         let region = vertex.as_voronoi_face();
         let mut region_vertices = vec![];
-        for edge in region.adjacent_edges() {
-            match [edge.from(), edge.to()] {
+        // let mut neighbors = vec![];
+
+        for edge in vertex.out_edges() {
+            let voronoi_edge = edge.as_voronoi_edge();
+            let neighbor = edge.to().position();
+            // {
+            //     let idx = edge.to().index();
+            //     let idx_find = triangulation.locate_vertex(neighbor).unwrap().index();
+            //     if idx != idx_find {
+            //         println!("{} != {}", idx, idx_find);
+            //     }
+            // }
+            match [voronoi_edge.from(), voronoi_edge.to()] {
                 [Inner(from), Inner(to)] => {
                     let from = from.circumcenter();
                     let to = to.circumcenter();
-                    let dir = edge.direction_vector();
+                    let dir = voronoi_edge.direction_vector();
+                    let dir = Vec2::new(dir.x, dir.y);
+                    // if dir.norm_squared() > 4.0 {
+                    //     println!("inner/inner length > 2");
+                    // }
+                    // let neighbor = edge.to().position();
 
+                    corners.insert(VoronoiCorner::new(from.x, from.y));
+                    corners.insert(VoronoiCorner::new(to.x, to.y));
                     region_vertices.push(VoronoiVertex::Inner(Vec2::new(to.x, to.y)));
                     region_vertices.push(VoronoiVertex::Inner(Vec2::new(from.x, from.y)));
                 }
@@ -126,23 +206,28 @@ fn extract_voronoi_regions(
                     let dir = edge.direction_vector();
                     let dir = Vec2::new(dir.x, dir.y);
 
-                    let dir = if dir.norm_squared() > 10f32 * 10f32 {
-                        dir.normalize() * 10.
+                    let dir = if dir.norm_squared() > 2.0 {
+                        dir.normalize()
                     } else {
                         dir
                     };
-                    let outerv = VoronoiVertex::Inner(from + dir);
-                    region_vertices.push(outerv.clone());
+                    let outer_pt = from + dir;
+
+                    corners.insert(VoronoiCorner::new(from.x, from.y));
+                    corners.insert(VoronoiCorner::new(outer_pt.x, outer_pt.y));
+                    region_vertices.push(VoronoiVertex::Inner(outer_pt));
                     region_vertices.push(VoronoiVertex::Inner(Vec2::new(from.x, from.y)));
                 }
                 [_, _] => {}
             };
         }
+        // regions_neighbors.insert(regions.len(), neighbors);
         regions.push(VoronoiRegion::new(
             Vec2::new(region_site.x, region_site.y),
             region_vertices,
         ));
     }
+    println!("count corners: {}", corners.len());
     regions
 }
 
