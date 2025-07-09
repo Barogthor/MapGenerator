@@ -172,18 +172,10 @@ fn extract_voronoi_regions(
 
         let region = vertex.as_voronoi_face();
         let mut region_vertices = vec![];
-        // let mut neighbors = vec![];
 
         for edge in vertex.out_edges() {
             let voronoi_edge = edge.as_voronoi_edge();
             let neighbor = edge.to().position();
-            // {
-            //     let idx = edge.to().index();
-            //     let idx_find = triangulation.locate_vertex(neighbor).unwrap().index();
-            //     if idx != idx_find {
-            //         println!("{} != {}", idx, idx_find);
-            //     }
-            // }
             match [voronoi_edge.from(), voronoi_edge.to()] {
                 [Inner(from), Inner(to)] => {
                     let from = from.circumcenter();

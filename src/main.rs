@@ -1,9 +1,15 @@
+use egui::ViewportId;
 use egui_glium::EguiGlium;
-use glium::glutin::dpi::{PhysicalSize, Size};
-use glium::glutin::window::WindowBuilder;
-use glium::glutin::GlProfile;
+use glium::backend::glutin::SimpleWindowBuilder;
+use glium::glutin::surface::WindowSurface;
 use glium::uniforms::AsUniformValue;
-use glium::Surface;
+use glium::winit::application::ApplicationHandler;
+use glium::winit::dpi::{PhysicalSize, Size};
+use glium::winit::event::WindowEvent;
+use glium::winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder};
+use glium::winit::window::WindowId;
+use glium::{glutin, winit, Display, Surface};
+
 use math::color::PresetColors;
 use math::glm::{vec3, Vec2};
 use math::map::{new_map, Map};
@@ -56,16 +62,19 @@ fn main() {
     tick_system.register_listener(TICK_FRAME_ID);
     tick_system.register_listener(TICK_DRAW_ID);
     tick_system.register_listener(TICK_RENDER_ID);
-    let event_loop: LoopType = LoopType::new();
-    let wb = WindowBuilder::new()
+    let event_loop = EventLoop::builder().build().unwrap();
+    let window_attributes = winit::window::Window::default_attributes()
         .with_title("Map generation")
         .with_inner_size(Size::Physical(PhysicalSize::new(
             WIDTH as u32,
             HEIGHT as u32,
         )));
-    let cb = glium::glutin::ContextBuilder::new().with_gl_profile(GlProfile::Core);
-    let display = glium::Display::new(wb, cb, &event_loop).unwrap();
-    let mut egui = EguiGlium::new(&display);
+    let config_template_builder = glutin::config::ConfigTemplateBuilder::new();
+    let (window, display) = SimpleWindowBuilder::new()
+        .set_window_builder(window_attributes)
+        .build(&event_loop);
+
+    let mut egui = EguiGlium::new(ViewportId::ROOT, &display, &window, &event_loop);
     let mut input = Input::create();
     let binding = Binding::create();
 
@@ -83,7 +92,7 @@ fn main() {
     let mut perspective = Ortho::default();
     let vp = perspective.get() * camera.view();
     let mut pre_vp: RawMat4 = vp.into();
-
+    // event_loop.run_app(app);
     event_loop.run(move |event, _, control_flow| match event {
         Event::NewEvents(cause) => match cause {
             StartCause::ResumeTimeReached { .. } => {}
@@ -94,16 +103,14 @@ fn main() {
             }
         },
         Event::MainEventsCleared => {
-            display.gl_window().window().request_redraw();
+            window.request_redraw();
         }
         Event::RedrawRequested(_) => {
             tick_system.start_tick(TICK_RENDER_ID);
-
-            egui.begin_frame(&display);
-
-            show_window(&mut egui, &mut state);
-
-            let (_needs_repaint, shapes) = egui.end_frame(&display);
+            let frame = display.draw();
+            egui.run(&window, |egui_ctx| {
+                show_window(&egui_ctx, &mut state);
+            });
 
             let mut frame = display.draw();
             let bgc = {
@@ -149,7 +156,7 @@ fn main() {
 
             tick_system.start_tick(TICK_RENDER_EGUI_ID);
 
-            egui.paint(&display, &mut frame, shapes);
+            egui.paint(&display, &mut frame);
             tick_system.end_tick(TICK_RENDER_EGUI_ID);
 
             frame.finish().unwrap();
@@ -228,7 +235,7 @@ fn main() {
             match &event {
                 Event::WindowEvent { event, .. } => {
                     if egui.is_quit_event(event) {
-                        *control_flow = glium::glutin::event_loop::ControlFlow::Exit;
+                        *control_flow = ControlFlow::Exit;
                     }
                     egui.on_event(event)
                 }
@@ -246,6 +253,40 @@ fn main() {
             }
         }
     });
+}
+
+struct App {
+    egui_glium: egui_glium::EguiGlium,
+    window: winit::window::Window,
+    display: glium::Display<WindowSurface>,
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, _event_loop: &ActiveEventLoop) {}
+
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        use winit::event::WindowEvent;
+        match &event {
+            WindowEvent::CloseRequested | WindowEvent::Destroyed => event_loop.exit(),
+            WindowEvent::Resized(new_size) => {
+                self.display.resize((*new_size).into());
+            }
+            WindowEvent::RedrawRequested => redraw(),
+            _ => {}
+        }
+
+        let event_response = self.egui_glium.on_event(&self.window, &event);
+
+        if event_response.repaint {
+            self.window.request_redraw();
+        }
+    }
+
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
+        if let StartCause::ResumeTimeReached { .. } = cause {
+            self.window.request_redraw();
+        }
+    }
 }
 
 fn setup_wires_and_sites_vertexes(map: &Map) -> (Vec<VertexColor>, Vec<VertexColor>) {

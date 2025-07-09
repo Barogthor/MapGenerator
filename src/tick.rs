@@ -111,8 +111,10 @@ impl TickSystem {
     pub fn duration_since_frame_start(&self) -> Option<f64> {
         if let Some(state) = self.running_tick.get(&TICK_FRAME_ID) {
             return match state {
-                TickState::Running(since) => Some(Instant::now().duration_since(since.clone()).as_secs_f64()),
-                _ => None
+                TickState::Running(since) => {
+                    Some(Instant::now().duration_since(since.clone()).as_secs_f64())
+                }
+                _ => None,
             };
         }
         None
@@ -120,29 +122,33 @@ impl TickSystem {
 
     pub fn debug_tick(&self, id: TickID) {
         if let Some(history) = self.tick_history.get(&id) {
-            println!("({:2}) {:7} lasted {:5.3} ms, avg ± {:5.3} (-{:5.3}, +{:5.3})",
-                     history.datas.len(),
-                     id,
-                     history.datas.last().unwrap().duration * 1000.,
-                     history.average * 1000.,
-                     (history.average - history.min) * 1000.,
-                     (history.max - history.average) * 1000.,
+            println!(
+                "({:2}) {:7} lasted {:5.3} ms, avg ± {:5.3} (-{:5.3}, +{:5.3})",
+                history.datas.len(),
+                id,
+                history.datas.last().unwrap().duration * 1000.,
+                history.average * 1000.,
+                (history.average - history.min) * 1000.,
+                (history.max - history.average) * 1000.,
             );
         }
     }
     pub fn debug_tick_iteration(&self) {
         if let Some(history) = self.tick_history.get(&TICK_FRAME_ID) {
-            println!("{:4} FPS with, avg ± {:5.3} ms (-{:5.3}, +{:5.3})",
-                     history.datas.len(),
-                     history.average * 1000.,
-                     (history.average - history.min) * 1000.,
-                     (history.max - history.average) * 1000.,
+            println!(
+                "{:4} FPS with, avg ± {:5.3} ms (-{:5.3}, +{:5.3})",
+                history.datas.len(),
+                history.average * 1000.,
+                (history.average - history.min) * 1000.,
+                (history.max - history.average) * 1000.,
             );
         }
     }
 
     pub fn reset(&mut self) {
-        self.tick_history.values_mut().for_each(|history| history.reset());
+        self.tick_history
+            .values_mut()
+            .for_each(|history| history.reset());
         self.remaining_time = 1.0;
     }
 
