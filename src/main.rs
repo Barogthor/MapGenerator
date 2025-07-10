@@ -6,18 +6,16 @@ use glium::uniforms::AsUniformValue;
 use glium::winit::application::ApplicationHandler;
 use glium::winit::dpi::{PhysicalSize, Size};
 use glium::winit::event::{StartCause, WindowEvent};
-use glium::winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder};
+use glium::winit::event_loop::{ActiveEventLoop, EventLoop};
 use glium::winit::window::WindowId;
-use glium::{glutin, winit, Display, Surface};
+use glium::{glutin, winit, Surface};
 
 use math::color::PresetColors;
 use math::glm::{vec3, Vec2};
 use math::map::{new_map, Map};
 use math::voronoi::VoronoiVertex::{self, Inner, Outer};
 use math::{float_eq, Boundary, CameraSystem, Ortho, RawMat4, Transform, TransformBuilder};
-use ui::winit::event::Event;
-use ui::winit::event_loop::ControlFlow;
-use ui::{Binding, Gesture, Input, LoopType};
+use ui::{Binding, Gesture, Input};
 use MapGenerator::pipeline::{RegionPipeline, SitePipeline, WirePipeline};
 use MapGenerator::tick::{
     TickSystem, TICK_DRAW_ID, TICK_FRAME_ID, TICK_RENDER_EGUI_ID, TICK_RENDER_ID,
@@ -58,7 +56,7 @@ fn main() {
     let region_vertexes = extract_region_mesh(&map);
     let camera_speed = 50.0f32;
     let draw_params = draw_params();
-    let mut tick_system = TickSystem::new();
+    let mut tick_system = TickSystem::default();
     tick_system.register_listener(TICK_FRAME_ID);
     tick_system.register_listener(TICK_DRAW_ID);
     tick_system.register_listener(TICK_RENDER_ID);
@@ -305,7 +303,6 @@ impl ApplicationHandler for App {
             event_loop.exit();
         }
 
-        // Handle map regeneration
         if self.context.ui_state.regenerate {
             self.context.ui_state.regenerate = false;
             self.context.map = self.context.map.regenerate(
@@ -339,24 +336,24 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: ()) {}
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: ()) {}
 
     fn device_event(
         &mut self,
-        event_loop: &ActiveEventLoop,
-        device_id: winit::event::DeviceId,
+        _event_loop: &ActiveEventLoop,
+        _device_id: winit::event::DeviceId,
         event: winit::event::DeviceEvent,
     ) {
         self.context.input.update_device_event(&event);
     }
 
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {}
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {}
 
-    fn suspended(&mut self, event_loop: &ActiveEventLoop) {}
+    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {}
 
-    fn exiting(&mut self, event_loop: &ActiveEventLoop) {}
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {}
 
-    fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {}
+    fn memory_warning(&mut self, _event_loop: &ActiveEventLoop) {}
 }
 
 fn setup_wires_and_sites_vertexes(map: &Map) -> (Vec<VertexColor>, Vec<VertexColor>) {

@@ -28,7 +28,7 @@ impl TickHistory {
         }
     }
     pub fn add(&mut self, start: Instant, end: Instant) {
-        let duration = end.duration_since(start.clone()).as_secs_f64();
+        let duration = end.duration_since(start).as_secs_f64();
         if self.min > duration {
             self.min = duration;
         }
@@ -73,14 +73,6 @@ pub struct TickSystem {
 }
 
 impl TickSystem {
-    pub fn new() -> Self {
-        Self {
-            tick_listeners: vec![],
-            running_tick: Default::default(),
-            tick_history: Default::default(),
-            remaining_time: 1.0,
-        }
-    }
     pub fn register_listener(&mut self, id: TickID) {
         if !self.tick_listeners.contains(&id) {
             self.tick_listeners.push(id);
@@ -112,7 +104,7 @@ impl TickSystem {
         if let Some(state) = self.running_tick.get(&TICK_FRAME_ID) {
             return match state {
                 TickState::Running(since) => {
-                    Some(Instant::now().duration_since(since.clone()).as_secs_f64())
+                    Some(Instant::now().duration_since(*since).as_secs_f64())
                 }
                 _ => None,
             };
@@ -159,6 +151,17 @@ impl TickSystem {
     pub fn update_time(&mut self) {
         if let Some(history) = self.tick_history.get(&TICK_FRAME_ID) {
             self.remaining_time -= history.datas.last().unwrap().duration;
+        }
+    }
+}
+
+impl Default for TickSystem {
+    fn default() -> Self {
+        Self {
+            tick_listeners: vec![],
+            running_tick: Default::default(),
+            tick_history: Default::default(),
+            remaining_time: 1.0,
         }
     }
 }

@@ -1,5 +1,4 @@
 use egui::{Context, Grid, Layout, SidePanel, TopBottomPanel, Ui, Widget};
-use egui_glium::EguiGlium;
 use glium::uniforms::{UniformValue, Uniforms};
 use glium::DrawParameters;
 use math::color::PresetColors;
@@ -116,7 +115,7 @@ impl Default for State {
 }
 
 fn label<'a>(title: &'a str) -> impl Widget + 'a {
-    let label = format!("{}:", title);
+    let label = format!("{title}:");
     move |ui: &mut Ui| ui.label(label)
 }
 
