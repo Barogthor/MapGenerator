@@ -1,5 +1,4 @@
-use egui::{Grid, Layout, SidePanel, TopBottomPanel, Ui, Widget};
-use egui_glium::EguiGlium;
+use egui::{Context, Grid, Layout, SidePanel, TopBottomPanel, Ui, Widget};
 use glium::uniforms::{UniformValue, Uniforms};
 use glium::DrawParameters;
 use math::color::PresetColors;
@@ -116,19 +115,19 @@ impl Default for State {
 }
 
 fn label<'a>(title: &'a str) -> impl Widget + 'a {
-    let label = format!("{}:", title);
+    let label = format!("{title}:");
     move |ui: &mut Ui| ui.label(label)
 }
 
 fn show_widgets(ui: &mut Ui, state: &mut State) {
     ui.add(label("Background"));
-    ui.color_edit_button_rgba_premultiplied(&mut state.background_color);
+    ui.color_edit_button_rgba_unmultiplied(&mut state.background_color);
     ui.end_row();
     ui.add(label("Show sites"));
     ui.checkbox(&mut state.show_sites, "");
     ui.end_row();
     ui.add(label("Distance"));
-    egui::ComboBox::from_id_source("distancefn").show_ui(ui, |ui| {
+    egui::ComboBox::from_id_salt("distancefn").show_ui(ui, |ui| {
         ui.selectable_value(&mut state.distance_fn, DistanceFn::Euclidean, "Euclidean");
         ui.selectable_value(&mut state.distance_fn, DistanceFn::Euclidean2, "Euclidean2");
         ui.selectable_value(
@@ -148,7 +147,7 @@ fn show_widgets(ui: &mut Ui, state: &mut State) {
     });
     ui.end_row();
     ui.add(label("Reshaping"));
-    egui::ComboBox::from_id_source("reshapingfn").show_ui(ui, |ui| {
+    egui::ComboBox::from_id_salt("reshapingfn").show_ui(ui, |ui| {
         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Input, "Input");
         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Flat, "Flat");
         ui.selectable_value(&mut state.reshape_fn, ReshapingFn::Clamped, "Clamped");
@@ -177,9 +176,9 @@ fn show_widgets(ui: &mut Ui, state: &mut State) {
     ui.end_row();
 }
 
-pub fn show_window(egui: &mut EguiGlium, state: &mut State) {
-    TopBottomPanel::top("my_top_bar").show(egui.ctx(), |ui| {
-        ui.with_layout(Layout::left_to_right(), |ui| {
+pub fn show_window(egui: &Context, state: &mut State) {
+    TopBottomPanel::top("my_top_bar").show(egui, |ui| {
+        ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
             if ui.button("Generate").clicked() {
                 state.regenerate = true;
             }
@@ -189,7 +188,7 @@ pub fn show_window(egui: &mut EguiGlium, state: &mut State) {
     });
     SidePanel::left("my_side_panel")
         .min_width(150.)
-        .show(egui.ctx(), |ui| {
+        .show(egui, |ui| {
             Grid::new("my_grid")
                 .num_columns(2)
                 .spacing([40.0, 4.0])

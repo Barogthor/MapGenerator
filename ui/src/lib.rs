@@ -3,7 +3,10 @@ pub type LoopType = winit::event_loop::EventLoop<()>;
 
 use crate::InputState::{Pressed, Released};
 use math::glm;
-use winit::event::{Event, MouseButton, VirtualKeyCode};
+use winit::{
+    event::{DeviceEvent, MouseButton, WindowEvent},
+    keyboard::{Key, NamedKey},
+};
 
 const MAX_MOUSE_BUTTONS: usize = 256;
 const MAX_KEY_BUTTONS: usize = 512;
@@ -12,8 +15,8 @@ pub type Sensitivity = f32;
 
 pub enum Gesture {
     NoGesture,
-    KeyHold(VirtualKeyCode),
-    KeyTrigger(VirtualKeyCode),
+    KeyHold(Key),
+    KeyTrigger(Key),
     ButtonHold(MouseButton),
     ButtonTrigger(MouseButton),
     AnyOf(Vec<Gesture>),
@@ -58,13 +61,13 @@ pub struct Input {
 
 impl Input {
     pub fn poll_gesture(&self, gesture: &Gesture) -> bool {
-        match *gesture {
+        match gesture {
             Gesture::QuitTrigger => self.quit_requested_index == self.current_index,
-            Gesture::KeyHold(code) => match self.key_buttons[code as usize] {
+            Gesture::KeyHold(key) => match self.key_buttons[logical_key_index(key)] {
                 InputState::Pressed(_) => true,
                 InputState::Released(_) => false,
             },
-            Gesture::KeyTrigger(code) => match self.key_buttons[code as usize] {
+            Gesture::KeyTrigger(key) => match self.key_buttons[logical_key_index(key)] {
                 InputState::Pressed(index) => self.current_index == index,
                 InputState::Released(_) => false,
             },
@@ -130,46 +133,44 @@ impl Input {
         self.mouse_grabbed
     }
 
-    pub fn update(&mut self, event: &Event<()>) {
+    pub fn update_window_event(&mut self, event: &WindowEvent) {
         match event {
-            Event::WindowEvent { event, .. } => match event {
-                winit::event::WindowEvent::KeyboardInput { input, .. } => {
-                    match (input.virtual_keycode, input.state) {
-                        (Some(key), winit::event::ElementState::Pressed) => {
-                            self.key_buttons[key as usize] = Pressed(self.current_index)
-                        }
-                        (Some(key), winit::event::ElementState::Released) => {
-                            self.key_buttons[key as usize] = Released(self.current_index)
-                        }
-                        (None, _) => {}
-                    }
+            winit::event::WindowEvent::KeyboardInput { event, .. } => match event.state {
+                winit::event::ElementState::Pressed => {
+                    self.key_buttons[logical_key_index(&event.logical_key)] =
+                        Pressed(self.current_index)
                 }
-                winit::event::WindowEvent::MouseWheel { delta, .. } => match delta {
-                    winit::event::MouseScrollDelta::LineDelta(x, y) => {
-                        self.mouse_wheel_dir += glm::vec2(*x, *y);
-                    }
-                    _ => {}
-                },
-                winit::event::WindowEvent::MouseInput { state, button, .. } => match state {
-                    winit::event::ElementState::Pressed => {
-                        self.mouse_buttons[mouse_button_index(button) as usize] =
-                            Pressed(self.current_index)
-                    }
-                    winit::event::ElementState::Released => {
-                        self.mouse_buttons[mouse_button_index(button) as usize] =
-                            Released(self.current_index)
-                    }
-                },
-                winit::event::WindowEvent::CloseRequested => {
-                    self.quit_requested_index = self.current_index
+                winit::event::ElementState::Released => {
+                    self.key_buttons[logical_key_index(&event.logical_key)] =
+                        Released(self.current_index)
+                }
+            },
+            winit::event::WindowEvent::MouseWheel { delta, .. } => match delta {
+                winit::event::MouseScrollDelta::LineDelta(x, y) => {
+                    self.mouse_wheel_dir += glm::vec2(*x, *y);
                 }
                 _ => {}
             },
+            winit::event::WindowEvent::MouseInput { state, button, .. } => match state {
+                winit::event::ElementState::Pressed => {
+                    self.mouse_buttons[mouse_button_index(button) as usize] =
+                        Pressed(self.current_index)
+                }
+                winit::event::ElementState::Released => {
+                    self.mouse_buttons[mouse_button_index(button) as usize] =
+                        Released(self.current_index)
+                }
+            },
+            winit::event::WindowEvent::CloseRequested => {
+                self.quit_requested_index = self.current_index
+            }
+            _ => {}
+        }
+    }
 
-            winit::event::Event::DeviceEvent {
-                event: winit::event::DeviceEvent::Motion { axis, value },
-                ..
-            } => {
+    pub fn update_device_event(&mut self, event: &DeviceEvent) {
+        match event {
+            winit::event::DeviceEvent::Motion { axis, value } => {
                 if *axis < 2 {
                     self.mouse_rel[*axis as usize] += *value as f32;
                 }
@@ -210,10 +211,111 @@ fn mouse_button_index(button: &MouseButton) -> usize {
         MouseButton::Middle => 1,
         MouseButton::Right => 2,
         MouseButton::Other(id) => *id as usize,
+        MouseButton::Back => 3,
+        MouseButton::Forward => 4,
     }
 }
 
-type Key = VirtualKeyCode;
+// useful when parameting programmatically or text config. But physical might be more suited when parameting with an interface detecting keys.
+fn logical_key_index(key: &Key) -> usize {
+    match key {
+        // Named keys (function keys, arrows, etc.)
+        Key::Named(named_key) => match named_key {
+            NamedKey::Escape => 0,
+            NamedKey::Tab => 1,
+            NamedKey::Backspace => 2,
+            NamedKey::Enter => 3,
+            NamedKey::Space => 4,
+            NamedKey::Insert => 5,
+            NamedKey::Delete => 6,
+            NamedKey::Home => 7,
+            NamedKey::End => 8,
+            NamedKey::PageUp => 9,
+            NamedKey::PageDown => 10,
+            NamedKey::ArrowLeft => 11,
+            NamedKey::ArrowUp => 12,
+            NamedKey::ArrowRight => 13,
+            NamedKey::ArrowDown => 14,
+            NamedKey::F1 => 15,
+            NamedKey::F2 => 16,
+            NamedKey::F3 => 17,
+            NamedKey::F4 => 18,
+            NamedKey::F5 => 19,
+            NamedKey::F6 => 20,
+            NamedKey::F7 => 21,
+            NamedKey::F8 => 22,
+            NamedKey::F9 => 23,
+            NamedKey::F10 => 24,
+            NamedKey::F11 => 25,
+            NamedKey::F12 => 26,
+            NamedKey::Shift => 27,
+            NamedKey::Control => 28,
+            NamedKey::Alt => 29,
+            NamedKey::Super => 30,
+            NamedKey::CapsLock => 31,
+            NamedKey::NumLock => 32,
+            NamedKey::ScrollLock => 33,
+            _ => 511, // Fallback for unmapped named keys
+        },
+        // Character keys (letters, numbers, symbols)
+        Key::Character(ch) => {
+            let ch_lower = ch
+                .chars()
+                .next()
+                .unwrap_or('\0')
+                .to_lowercase()
+                .next()
+                .unwrap_or('\0');
+            match ch_lower {
+                // Letters a-z
+                'a'..='z' => 34 + (ch_lower as usize - 'a' as usize),
+                // Numbers 0-9
+                '0'..='9' => 60 + (ch_lower as usize - '0' as usize),
+                // Common symbols
+                '`' => 70,
+                '-' => 71,
+                '=' => 72,
+                '[' => 73,
+                ']' => 74,
+                '\\' => 75,
+                ';' => 76,
+                '\'' => 77,
+                ',' => 78,
+                '.' => 79,
+                '/' => 80,
+                // Shifted symbols
+                '~' => 81,
+                '!' => 82,
+                '@' => 83,
+                '#' => 84,
+                '$' => 85,
+                '%' => 86,
+                '^' => 87,
+                '&' => 88,
+                '*' => 89,
+                '(' => 90,
+                ')' => 91,
+                '_' => 92,
+                '+' => 93,
+                '{' => 94,
+                '}' => 95,
+                '|' => 96,
+                ':' => 97,
+                '"' => 98,
+                '<' => 99,
+                '>' => 100,
+                '?' => 101,
+                ' ' => 4, // Space (same as Named(NamedKey::Space))
+                _ => 510, // Fallback for unmapped characters
+            }
+        }
+        // Unidentified keys
+        Key::Unidentified(_) => 509,
+        // Dead keys (for composition)
+        Key::Dead(_) => 508,
+    }
+}
+
 pub struct Binding {
     pub exit: Gesture,
     pub movement: Analog2d,
@@ -231,35 +333,35 @@ pub struct Binding {
 impl Binding {
     pub fn create() -> Self {
         Self {
-            exit: Gesture::KeyTrigger(Key::Escape),
+            exit: Gesture::KeyTrigger(Key::Named(NamedKey::Escape)),
             movement: Analog2d::Gestures {
                 x_positive: Gesture::AnyOf(vec![
-                    Gesture::KeyHold(Key::D),
-                    Gesture::KeyHold(Key::Right),
+                    Gesture::KeyHold(Key::Character("d".into())),
+                    Gesture::KeyHold(Key::Named(NamedKey::ArrowRight)),
                 ]),
                 x_negative: Gesture::AnyOf(vec![
-                    Gesture::KeyHold(Key::Q),
-                    Gesture::KeyHold(Key::Left),
+                    Gesture::KeyHold(Key::Character("q".into())),
+                    Gesture::KeyHold(Key::Named(NamedKey::ArrowLeft)),
                 ]),
                 y_positive: Gesture::AnyOf(vec![
-                    Gesture::KeyHold(Key::Z),
-                    Gesture::KeyHold(Key::Up),
+                    Gesture::KeyHold(Key::Character("z".into())),
+                    Gesture::KeyHold(Key::Named(NamedKey::ArrowUp)),
                 ]),
                 y_negative: Gesture::AnyOf(vec![
-                    Gesture::KeyHold(Key::S),
-                    Gesture::KeyHold(Key::Down),
+                    Gesture::KeyHold(Key::Character("s".into())),
+                    Gesture::KeyHold(Key::Named(NamedKey::ArrowDown)),
                 ]),
                 step: 0.15,
             },
             look: Analog2d::Mouse { sensitivity: 0.015 },
-            jump: Gesture::KeyHold(Key::Space),
-            fall: Gesture::KeyHold(Key::C),
-            fullscreen: Gesture::KeyTrigger(Key::F),
+            jump: Gesture::KeyHold(Key::Named(NamedKey::Space)),
+            fall: Gesture::KeyHold(Key::Character("c".into())),
+            fullscreen: Gesture::KeyTrigger(Key::Character("f".into())),
             scroll: Analog2d::MouseWheel { sensitivity: 0.030 },
             toggle_mouse: Gesture::ButtonHold(MouseButton::Right),
-            toggle_torch_light: Gesture::KeyTrigger(Key::T),
-            speedup: Gesture::KeyTrigger(Key::NumpadAdd),
-            speeddown: Gesture::KeyTrigger(Key::NumpadSubtract),
+            toggle_torch_light: Gesture::KeyTrigger(Key::Character("t".into())),
+            speedup: Gesture::KeyTrigger(Key::Character("+".into())),
+            speeddown: Gesture::KeyTrigger(Key::Character("-".into())),
         }
     }
 }

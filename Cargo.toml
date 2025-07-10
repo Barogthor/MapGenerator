@@ -8,9 +8,9 @@ edition = "2021"
 [dependencies]
 ui = {path = "ui"}
 math = {path = "math"}
-glium = "0.30.2"
+glium = "0.36.0"
 rusttype = "0.9.2"
-image = "0.24.6"
-egui= { version = "0.14.0" }
-egui_glium= { version = "0.14.0" }
-num-complex = "0.4.3"
+image = "0.25.6"
+egui= { version = "0.31.1" }
+egui_glium= { version = "0.31.1" }
+num-complex = "0.4.6"
