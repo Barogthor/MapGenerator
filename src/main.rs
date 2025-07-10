@@ -5,7 +5,7 @@ use glium::glutin::surface::WindowSurface;
 use glium::uniforms::AsUniformValue;
 use glium::winit::application::ApplicationHandler;
 use glium::winit::dpi::{PhysicalSize, Size};
-use glium::winit::event::WindowEvent;
+use glium::winit::event::{StartCause, WindowEvent};
 use glium::winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopBuilder};
 use glium::winit::window::WindowId;
 use glium::{glutin, winit, Display, Surface};
@@ -14,8 +14,8 @@ use math::color::PresetColors;
 use math::glm::{vec3, Vec2};
 use math::map::{new_map, Map};
 use math::voronoi::VoronoiVertex::{self, Inner, Outer};
-use math::{float_eq, Boundary, CameraSystem, Ortho, RawMat4, TransformBuilder};
-use ui::winit::event::{Event, StartCause};
+use math::{float_eq, Boundary, CameraSystem, Ortho, RawMat4, Transform, TransformBuilder};
+use ui::winit::event::Event;
 use ui::winit::event_loop::ControlFlow;
 use ui::{Binding, Gesture, Input, LoopType};
 use MapGenerator::pipeline::{RegionPipeline, SitePipeline, WirePipeline};
@@ -49,14 +49,14 @@ fn extract_region_mesh(map: &Map) -> Vec<VertexColor> {
 }
 
 fn main() {
-    let mut zoom_factor = 0.0;
-    let mut state = State::default();
+    let zoom_factor = 0.0;
+    let state = State::default();
     let boundary = Boundary::from_top_left(Vec2::new(-32.0, 32.0), 64., 64.);
     let seed = 12345;
-    let mut map = new_map(boundary, seed, state.distance_fn, state.reshape_fn);
+    let map = new_map(boundary, seed, state.distance_fn, state.reshape_fn);
     let (voronoi_sites, voronoi_wires) = setup_wires_and_sites_vertexes(&map);
     let region_vertexes = extract_region_mesh(&map);
-    let mut camera_speed = 50.0f32;
+    let camera_speed = 50.0f32;
     let draw_params = draw_params();
     let mut tick_system = TickSystem::new();
     tick_system.register_listener(TICK_FRAME_ID);
@@ -69,196 +69,213 @@ fn main() {
             WIDTH as u32,
             HEIGHT as u32,
         )));
-    let config_template_builder = glutin::config::ConfigTemplateBuilder::new();
+    let _config_template_builder = glutin::config::ConfigTemplateBuilder::new();
     let (window, display) = SimpleWindowBuilder::new()
         .set_window_builder(window_attributes)
         .build(&event_loop);
 
-    let mut egui = EguiGlium::new(ViewportId::ROOT, &display, &window, &event_loop);
-    let mut input = Input::create();
+    let egui = EguiGlium::new(ViewportId::ROOT, &display, &window, &event_loop);
+    let input = Input::create();
     let binding = Binding::create();
 
-    let mut region_pipeline = RegionPipeline::new(region_vertexes, &display);
-    let mut site_pipeline = SitePipeline::new(voronoi_sites, &display);
-    let mut wire_pipeline = WirePipeline::new(voronoi_wires, &display);
+    let region_pipeline = RegionPipeline::new(region_vertexes, &display);
+    let site_pipeline = SitePipeline::new(voronoi_sites, &display);
+    let wire_pipeline = WirePipeline::new(voronoi_wires, &display);
 
     let map_model = TransformBuilder::new().scale(0.5, 0.5, 0.5).build();
 
-    let mut camera = CameraSystem::default();
+    let camera = CameraSystem::default();
     // let (mut w, mut h) = (
     //     display.get_framebuffer_dimensions().0,
     //     display.get_framebuffer_dimensions().1,
     // );
-    let mut perspective = Ortho::default();
+    let perspective = Ortho::default();
     let vp = perspective.get() * camera.view();
-    let mut pre_vp: RawMat4 = vp.into();
-    // event_loop.run_app(app);
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::NewEvents(cause) => match cause {
-            StartCause::ResumeTimeReached { .. } => {}
-            StartCause::WaitCancelled { .. } => {}
-            StartCause::Poll => {}
-            StartCause::Init => {
-                tick_system.start_tick(TICK_FRAME_ID);
-            }
-        },
-        Event::MainEventsCleared => {
-            window.request_redraw();
-        }
-        Event::RedrawRequested(_) => {
-            tick_system.start_tick(TICK_RENDER_ID);
-            let frame = display.draw();
-            egui.run(&window, |egui_ctx| {
-                show_window(&egui_ctx, &mut state);
-            });
+    let pre_vp: RawMat4 = vp.into();
 
-            let mut frame = display.draw();
-            let bgc = {
-                let c = &state.background_color;
-                (c[0], c[1], c[2], c[3])
-            };
-            frame.clear_color_and_depth(bgc, 1.);
-            let view_pos: [f32; 3] = camera.pos.into();
-            let view: RawMat4 = camera.view().into();
-            {
-                let model = map_model.get_raw();
-                let mut my_storage = UniformStorage::default();
-                my_storage.add("vp", pre_vp.as_uniform_value());
-                my_storage.add("view", view.as_uniform_value());
-                my_storage.add("model", model.as_uniform_value());
-                my_storage.add("viewPos", view_pos.as_uniform_value());
-                region_pipeline
-                    .draw(&mut frame, &my_storage, &draw_params)
-                    .unwrap();
-            }
-            if state.show_sites {
-                let model = map_model.get_raw();
-                let mut my_storage = UniformStorage::default();
-                my_storage.add("vp", pre_vp.as_uniform_value());
-                my_storage.add("view", view.as_uniform_value());
-                my_storage.add("model", model.as_uniform_value());
-                my_storage.add("viewPos", view_pos.as_uniform_value());
-                site_pipeline
-                    .draw(&mut frame, &my_storage, &draw_params)
-                    .unwrap();
-            }
-            {
-                let model = map_model.get_raw();
-                let mut my_storage = UniformStorage::default();
-                my_storage.add("vp", pre_vp.as_uniform_value());
-                my_storage.add("view", view.as_uniform_value());
-                my_storage.add("model", model.as_uniform_value());
-                my_storage.add("viewPos", view_pos.as_uniform_value());
-                wire_pipeline
-                    .draw(&mut frame, &my_storage, &draw_params)
-                    .unwrap();
-            }
+    // Initialize App with all the context
+    let context = AppContext {
+        input,
+        camera,
+        ui_state: state,
+        frame_diagnostic: tick_system,
+        bindings: binding,
+        map,
+        region_pipeline,
+        site_pipeline,
+        wire_pipeline,
+        map_model,
+        camera_speed,
+        zoom_factor,
+        perspective,
+        pre_vp,
+        draw_params,
+    };
 
-            tick_system.start_tick(TICK_RENDER_EGUI_ID);
+    let mut app = App {
+        egui_glium: egui,
+        window,
+        display,
+        context,
+    };
 
-            egui.paint(&display, &mut frame);
-            tick_system.end_tick(TICK_RENDER_EGUI_ID);
+    event_loop.run_app(&mut app).unwrap();
+}
 
-            frame.finish().unwrap();
-            tick_system.end_tick(TICK_RENDER_ID);
-            // tick_system.debug_tick(TICK_RENDER_ID);
-        }
-        Event::RedrawEventsCleared => {
-            if input.poll_gesture(&binding.exit)
-                || input.poll_gesture(&Gesture::QuitTrigger)
-                || state.quit
-            {
-                *control_flow = ControlFlow::Exit;
-            }
-            // if input.poll_gesture(&binding.toggle_mouse) {
-            //     let window_context = display.gl_window();
-            //     let window = window_context.window();
-            //     // let win_pos = window.set_cursor_visible(false);
-            //     let mouse = &input.poll_analog2d(&binding.look);
-            //
-            //     w = display.get_framebuffer_dimensions().0;
-            //     h = display.get_framebuffer_dimensions().1;
-            //     window.set_cursor_position(PhysicalPosition::new(w / 2, h / 2)).unwrap();
-            //     yaw += mouse.x;
-            //     pitch += mouse.y;
-            //     if pitch > PITCH_MAX {
-            //         pitch = PITCH_MAX;
-            //     }
-            //     if pitch < -PITCH_MAX {
-            //         pitch = -PITCH_MAX;
-            //     }
-            //     let direction = vec3(
-            //         yaw.cos() * pitch.cos(),
-            //         pitch.sin(),
-            //         yaw.sin() * pitch.cos(),
-            //     );
-            //     camera.front = direction.normalize();
-            //     // light_spot.direction.data = direction.normalize();
-            // }
-            let step = input.poll_analog2d(&binding.scroll);
-            if !float_eq(step.y, 0.0, 1e-3) {
-                let future_zoom = zoom_factor - step.y * 10.;
-                if future_zoom > -5. && future_zoom < 10. {
-                    zoom_factor = future_zoom;
-                    perspective.zoom(-step.y * 10.);
-                }
-            }
-
-            if input.poll_gesture(&binding.speedup) {
-                camera_speed += 5.;
-            }
-            if input.poll_gesture(&binding.speeddown) && camera_speed > 10. {
-                camera_speed -= 5.;
-            }
-
-            pre_vp = (perspective.get() * camera.view()).into();
-
-            if let Some(duration) = tick_system.duration_since_frame_start() {
-                let step = input.poll_analog2d(&binding.movement);
-
-                if step.y != 0. || step.x != 0. {
-                    camera.pos += vec3(step.x, step.y, 0.0) * camera_speed * duration as f32;
-                    // println!("{}", camera.pos);
-                }
-            }
-            input.tick_reset();
-            tick_system.end_tick(TICK_FRAME_ID);
-            // tick_system.debug_tick(TICK_FRAME_ID);
-            tick_system.update_time();
-            if tick_system.should_reset() {
-                tick_system.debug_tick_iteration();
-                tick_system.reset();
-            }
-            tick_system.start_tick(TICK_FRAME_ID);
-        }
-        _ => {
-            match &event {
-                Event::WindowEvent { event, .. } => {
-                    if egui.is_quit_event(event) {
-                        *control_flow = ControlFlow::Exit;
-                    }
-                    egui.on_event(event)
-                }
-                _ => {}
-            }
-            input.update(&event);
-            if state.regenerate {
-                state.regenerate = false;
-                map = map.regenerate(state.seed, state.distance_fn, state.reshape_fn);
-                let regions_vertexes = extract_region_mesh(&map);
-                let (sites_vertexes, wires_vertexes) = setup_wires_and_sites_vertexes(&map);
-                region_pipeline.update_vertexes(&display, regions_vertexes);
-                site_pipeline.update_vertexes(&display, sites_vertexes);
-                wire_pipeline.update_vertexes(&display, wires_vertexes);
-            }
-        }
-    });
+struct AppContext {
+    input: Input,
+    camera: CameraSystem,
+    ui_state: State,
+    frame_diagnostic: TickSystem,
+    bindings: Binding,
+    map: Map,
+    region_pipeline: RegionPipeline,
+    site_pipeline: SitePipeline,
+    wire_pipeline: WirePipeline,
+    map_model: Transform,
+    camera_speed: f32,
+    zoom_factor: f32,
+    perspective: Ortho,
+    pre_vp: RawMat4,
+    draw_params: glium::DrawParameters<'static>,
 }
 
 struct App {
     egui_glium: egui_glium::EguiGlium,
     window: winit::window::Window,
     display: glium::Display<WindowSurface>,
+    context: AppContext,
+}
+
+impl App {
+    fn redraw_window(&mut self) {
+        self.context.frame_diagnostic.start_tick(TICK_RENDER_ID);
+
+        self.egui_glium.run(&self.window, |egui_ctx| {
+            show_window(egui_ctx, &mut self.context.ui_state);
+        });
+
+        let mut frame = self.display.draw();
+        let bgc = {
+            let c = &self.context.ui_state.background_color;
+            (c[0], c[1], c[2], c[3])
+        };
+        frame.clear_color_and_depth(bgc, 1.);
+        let view_pos: [f32; 3] = self.context.camera.pos.into();
+        let view: RawMat4 = self.context.camera.view().into();
+
+        // Draw regions
+        {
+            let model = self.context.map_model.get_raw();
+            let mut my_storage = UniformStorage::default();
+            my_storage.add("vp", self.context.pre_vp.as_uniform_value());
+            my_storage.add("view", view.as_uniform_value());
+            my_storage.add("model", model.as_uniform_value());
+            my_storage.add("viewPos", view_pos.as_uniform_value());
+            self.context
+                .region_pipeline
+                .draw(&mut frame, &my_storage, &self.context.draw_params)
+                .unwrap();
+        }
+
+        // Draw sites if enabled
+        if self.context.ui_state.show_sites {
+            let model = self.context.map_model.get_raw();
+            let mut my_storage = UniformStorage::default();
+            my_storage.add("vp", self.context.pre_vp.as_uniform_value());
+            my_storage.add("view", view.as_uniform_value());
+            my_storage.add("model", model.as_uniform_value());
+            my_storage.add("viewPos", view_pos.as_uniform_value());
+            self.context
+                .site_pipeline
+                .draw(&mut frame, &my_storage, &self.context.draw_params)
+                .unwrap();
+        }
+
+        // Draw wires
+        {
+            let model = self.context.map_model.get_raw();
+            let mut my_storage = UniformStorage::default();
+            my_storage.add("vp", self.context.pre_vp.as_uniform_value());
+            my_storage.add("view", view.as_uniform_value());
+            my_storage.add("model", model.as_uniform_value());
+            my_storage.add("viewPos", view_pos.as_uniform_value());
+            self.context
+                .wire_pipeline
+                .draw(&mut frame, &my_storage, &self.context.draw_params)
+                .unwrap();
+        }
+
+        self.context
+            .frame_diagnostic
+            .start_tick(TICK_RENDER_EGUI_ID);
+        self.egui_glium.paint(&self.display, &mut frame);
+        self.context.frame_diagnostic.end_tick(TICK_RENDER_EGUI_ID);
+
+        frame.finish().unwrap();
+        self.context.frame_diagnostic.end_tick(TICK_RENDER_ID);
+    }
+
+    fn handle_input_events_window(&mut self) -> Option<()> {
+        if self.context.input.poll_gesture(&self.context.bindings.exit)
+            || self.context.input.poll_gesture(&Gesture::QuitTrigger)
+            || self.context.ui_state.quit
+        {
+            return Some(());
+        }
+
+        let step = self
+            .context
+            .input
+            .poll_analog2d(&self.context.bindings.scroll);
+        if !float_eq(step.y, 0.0, 1e-3) {
+            let future_zoom = self.context.zoom_factor - step.y * 10.;
+            if future_zoom > -5. && future_zoom < 10. {
+                self.context.zoom_factor = future_zoom;
+                self.context.perspective.zoom(-step.y * 10.);
+            }
+        }
+
+        if self
+            .context
+            .input
+            .poll_gesture(&self.context.bindings.speedup)
+        {
+            self.context.camera_speed += 5.;
+        }
+        if self
+            .context
+            .input
+            .poll_gesture(&self.context.bindings.speeddown)
+            && self.context.camera_speed > 10.
+        {
+            self.context.camera_speed -= 5.;
+        }
+
+        self.context.pre_vp = (self.context.perspective.get() * self.context.camera.view()).into();
+
+        if let Some(duration) = self.context.frame_diagnostic.duration_since_frame_start() {
+            let step = self
+                .context
+                .input
+                .poll_analog2d(&self.context.bindings.movement);
+
+            if step.y != 0. || step.x != 0. {
+                self.context.camera.pos +=
+                    vec3(step.x, step.y, 0.0) * self.context.camera_speed * duration as f32;
+            }
+        }
+
+        self.context.input.tick_reset();
+        self.context.frame_diagnostic.end_tick(TICK_FRAME_ID);
+        self.context.frame_diagnostic.update_time();
+        if self.context.frame_diagnostic.should_reset() {
+            self.context.frame_diagnostic.debug_tick_iteration();
+            self.context.frame_diagnostic.reset();
+        }
+        self.context.frame_diagnostic.start_tick(TICK_FRAME_ID);
+        None
+    }
 }
 
 impl ApplicationHandler for App {
@@ -271,22 +288,75 @@ impl ApplicationHandler for App {
             WindowEvent::Resized(new_size) => {
                 self.display.resize((*new_size).into());
             }
-            WindowEvent::RedrawRequested => redraw(),
+            WindowEvent::RedrawRequested => {
+                self.redraw_window();
+            }
             _ => {}
         }
+        self.context.input.update_window_event(&event);
 
         let event_response = self.egui_glium.on_event(&self.window, &event);
 
         if event_response.repaint {
             self.window.request_redraw();
         }
+
+        if self.handle_input_events_window().is_some() {
+            event_loop.exit();
+        }
+
+        // Handle map regeneration
+        if self.context.ui_state.regenerate {
+            self.context.ui_state.regenerate = false;
+            self.context.map = self.context.map.regenerate(
+                self.context.ui_state.seed,
+                self.context.ui_state.distance_fn,
+                self.context.ui_state.reshape_fn,
+            );
+            let regions_vertexes = extract_region_mesh(&self.context.map);
+            let (sites_vertexes, wires_vertexes) =
+                setup_wires_and_sites_vertexes(&self.context.map);
+            self.context
+                .region_pipeline
+                .update_vertexes(&self.display, regions_vertexes);
+            self.context
+                .site_pipeline
+                .update_vertexes(&self.display, sites_vertexes);
+            self.context
+                .wire_pipeline
+                .update_vertexes(&self.display, wires_vertexes);
+        }
     }
 
     fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
-        if let StartCause::ResumeTimeReached { .. } = cause {
-            self.window.request_redraw();
+        match cause {
+            StartCause::ResumeTimeReached { .. } => {}
+            StartCause::WaitCancelled { .. } => {}
+            StartCause::Poll => {}
+            StartCause::Init => {
+                self.context.frame_diagnostic.start_tick(TICK_FRAME_ID);
+            }
         }
     }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: ()) {}
+
+    fn device_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        device_id: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
+    ) {
+        self.context.input.update_device_event(&event);
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {}
+
+    fn suspended(&mut self, event_loop: &ActiveEventLoop) {}
+
+    fn exiting(&mut self, event_loop: &ActiveEventLoop) {}
+
+    fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {}
 }
 
 fn setup_wires_and_sites_vertexes(map: &Map) -> (Vec<VertexColor>, Vec<VertexColor>) {

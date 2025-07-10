@@ -1,6 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## Development Commands
 
 ```bash
@@ -50,6 +51,7 @@ cargo run --release      # Run optimized version
 ## Architecture Overview
 
 This is a **procedural map generator** built with Rust that creates realistic terrain using computational geometry. The project is organized as a workspace with three crates:
+It should inspire itself with architecture coming from game engines to optimize the differents aspect of the application (Input, rendering, Systems, ...).
 
 ### Crate Structure
 - **Main crate** (`/src/`) - Application logic, OpenGL rendering, and UI integration
